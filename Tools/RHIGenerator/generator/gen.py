@@ -27,6 +27,22 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 **/
 '''
+api_def = '''
+#if _WIN32
+  #if defined(LIB_BUILD)
+    #if defined(BUILD_SHARED_LIB)
+      #define NGFX_API __declspec(dllexport)
+    #else
+      #define NGFX_API __declspec(dllimport)
+    #endif
+  #else
+    #define NGFX_API     
+  #endif
+#else
+  #define NGFX_API __attribute__((visibility("default"))) 
+#endif
+'''
+
 
 refercounted_src = '''
 template <bool ThreadSafe>
@@ -164,7 +180,7 @@ public:
   {{
     return m_Ptr;
   }}
-  NGFXObj** GetAddressOf() const
+  NGFXObj** GetAddressOf()
   {{
     return &m_Ptr;
   }}
@@ -203,6 +219,8 @@ class TemplateGenerator(object):
 
             self.__header__.write('#include <stdint.h>\n')
             
+            self.__header__.write(api_def)
+
             self.__header__.write('\ntypedef float    Float32;'
                                   '\ntypedef uint32_t Bool32;'
                                   '\ntypedef struct { Float32 x,y,z,w; } Float32x4;\n')
@@ -353,15 +371,23 @@ class TemplateGenerator(object):
             r_type_name = r_type_name[1:]
         return r_type_name
 
-    def write_function(self, function):
+    def write_function(self, function, is_cpp=True):
         func_decl = function['val']
         ret = 'void' if 'return' not in func_decl else func_decl['return']
-        self.__header__.write('{0} (*{1})'.format(ret, function['function']))
-        if 'param' in func_decl:
+        exported = 'exported' in func_decl
+        ret_type = self.get_real_type_name(ret, None, is_cpp)
+        if exported:
+          self.__header__.write('\n{0} NGFX_API {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
+        else:
+          self.__header__.write('\n{0} {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
+
+        if 'params' in func_decl:
             self.__header__.write('(')
             paralist = []
-            for (param_name, param_t) in func_decl['param'].items():
-                paralist.append('{0} {1}'.format(param_t, param_name))
+            for param in func_decl['params']:
+              param_name = param['name']
+              param_t = param['type']
+              paralist.append('{0} {1}'.format(self.get_real_type_name(param_t, None, is_cpp), param_name))
             paralist_str = ', '.join(paralist)
             self.__header__.write(paralist_str+');\n')
 
@@ -420,6 +446,18 @@ class TemplateGenerator(object):
           table_src = '{0} Convert{1}ToVulkanEnum({2} const& e) {{\n  switch(e) {{\n'.format(real_converted_enum, make_name_AxxBxx(enum_name), real_enum_name)
           for enum_val in enum_values:
             converted_val = enum_val[enum_val.keys()[0]]['vulkan']
+            enum_val_name = '::'.join([real_enum_name, make_name_AxxBxx(enum_val.keys()[0])])
+            case_sec = '  case {0}:\n    return {1};\n'.format(enum_val_name, converted_val)
+            table_src = table_src + case_sec
+          table_src = table_src + '  }\n}\n'
+          self.__table__.write(table_src)
+        elif 'glslang' in enum_tree and is_cpp:
+          enum_values = enum_tree['enums']
+          real_converted_enum = enum_tree['glslang']
+          real_enum_name = NameUtil['cpp_enum' if is_cpp else 'enum'](self.ns, enum_name)
+          table_src = '{0} Convert{1}ToGlslangEnum({2} const& e) {{\n  switch(e) {{\n'.format(real_converted_enum, make_name_AxxBxx(enum_name), real_enum_name)
+          for enum_val in enum_values:
+            converted_val = enum_val[enum_val.keys()[0]]['glslang']
             enum_val_name = '::'.join([real_enum_name, make_name_AxxBxx(enum_val.keys()[0])])
             case_sec = '  case {0}:\n    return {1};\n'.format(enum_val_name, converted_val)
             table_src = table_src + case_sec

@@ -37,12 +37,18 @@ protype:
 
     - MultiSample flag:
         type: enum
+        vulkan: VkSampleCountFlagBits
         enums:
-          - MS 1x
-          - MS 2x
-          - MS 4x
-          - MS 8x
-          - MS 16x
+          - MS 1x:
+                vulkan: VK_SAMPLE_COUNT_1_BIT
+          - MS 2x:
+                vulkan: VK_SAMPLE_COUNT_2_BIT
+          - MS 4x:
+                vulkan: VK_SAMPLE_COUNT_4_BIT
+          - MS 8x:
+                vulkan: VK_SAMPLE_COUNT_8_BIT
+          - MS 16x:
+                vulkan: VK_SAMPLE_COUNT_16_BIT
 
     - load action:
         type: enum
@@ -191,6 +197,31 @@ protype:
             - Unorder Access Texture
             - Unorder Access Buffer
     
+    - buffer view bit:
+        type: enum
+        bitmask: true
+        enums:
+            - UnOrdered Access
+            - Shader Resource
+            - Constant Buffer
+            - Vertex Buffer
+
+    - texture view bit:
+        type: enum
+        bitmask: true
+        enums:
+            - Shader Read
+            - Shader Write
+            - Render Target
+            - Depth Stencil
+
+    - storage option:
+        type: enum
+        enums:
+            - shared
+            - private
+            - managed
+
     - texture dimension:
         type: enum
         enums:
@@ -359,8 +390,15 @@ protype:
         type: struct
         comment: Description of a buffer
         members:
+            - name: allowedViewBits
+              type: buffer view bit
+              default: Constant Buffer
+            - name: option
+              type: storage option
+              default: managed
             - name: size
               type: uint64_t
+              default: 0
 
     - buffer view desc:
         type: struct
@@ -381,6 +419,12 @@ protype:
         type: struct
         comment: Description of a texture
         members:
+            - name: allowedViewBits
+              type: texture view bit
+            - name: option
+              type: storage option
+            - name: samples
+              type: MultiSample flag
             - name: format
               type: pixel format
             - name: width
@@ -544,10 +588,11 @@ protype:
           - Buffer
           - Constant
 
-    - pipeline layout desc:
+    - shader binding:
         type: struct
-        comment: Description of Pipeline Layout (How to layout bindings)
         members:
+          - name: name
+            type: const char *
           - name: visibility
             type: shader stage bit
           - name: bindingType
@@ -555,6 +600,27 @@ protype:
           - name: slot
             type: uint32_t
           - name: count
+            type: uint32_t
+
+    - shader layout desc:
+        type: struct
+        members:
+            - name: pShaderBindings
+              type: const shader binding *
+            - name: count
+              type: uint32_t
+
+    - shader layout:
+        type: interface
+        inherit: ref counted<false>
+
+    - pipeline layout desc:
+        type: struct
+        comment: Description of Pipeline Layout (How to layout bindings)
+        members:
+          - name: pShaderLayout
+            type: const shader layout *
+          - name: shaderLayoutCount
             type: uint32_t
 
     - attachment desc:
@@ -636,13 +702,20 @@ protype:
     - shader type:
         type: enum
         comment: Type of shader
+        glslang: EShLanguage
         enums:
-            - Vertex
-            - Fragment
-            - Compute
-            - Geometry
-            - TessailationEval
-            - TessailationControl
+            - Vertex:
+                glslang: EShLangVertex
+            - Fragment:
+                glslang: EShLangFragment
+            - Compute:
+                glslang: EShLangCompute
+            - Geometry:
+                glslang: EShLangGeometry
+            - TessailationEval:
+                glslang: EShLangTessEvaluation
+            - TessailationControl:
+                glslang: EShLangTessControl
 
     - viewport:
         type: struct
@@ -677,6 +750,10 @@ protype:
         inherit: named object<false>
         comment: Present drawables
         functions:
+            - current drawable:
+                return: drawable *
+            - next drawable:
+                return: drawable *
             - get texture:
                 params:
                   - name: ppTexture
@@ -684,7 +761,8 @@ protype:
                   - name: index
                     type: uint32_t
                 return: result
-            - present
+            - buffer count:
+                return: uint32_t
 
     - function:
         type: interface
@@ -698,6 +776,10 @@ protype:
     - shader option:
         type: struct
         members:
+          - name: stage
+            type: shader type
+          - name: language
+            type: shader lang
           - name: entryName
             type: const char *
           - name: profile
@@ -865,6 +947,13 @@ protype:
                     - name: pDesc
                       type: buffer desc *
                 return: result
+            - create view:
+                params:
+                    - name: pDesc
+                      type: const buffer view desc *
+                    - name: ppView
+                      type: buffer view **
+                return: result
 
     - buffer view:
         type: interface
@@ -879,10 +968,24 @@ protype:
                     - name: pDesc
                       type: texture desc *
                 return: result
+            - create view:
+                params:
+                    - name: pDesc
+                      type: const texture view desc *
+                    - name: ppView
+                      type: texture view **
+                return: result
 
     - texture view:
         type: interface
         inherit: named object<false>
+
+    - drawable:
+        type: interface
+        inherit: ref counted<true>
+        functions:
+            - texture:
+                return: texture *
 
     - device:
         type: interface
@@ -899,6 +1002,13 @@ protype:
                       type: command queue type
                     - name: pQueue
                       type: command queue **
+                return: result
+            - create shader layout:
+                params:
+                    - name: pShaderLayoutDesc
+                      type: const shader layout desc *
+                    - name: ppShaderLayout
+                      type: shader layout **
                 return: result
             - create pipeline layout:
                 params:
@@ -962,15 +1072,6 @@ protype:
                     - name: pBuffer
                       type: buffer **
                 return: result
-            - create buffer view:
-                params:
-                    - name: desc
-                      type: const buffer view desc *
-                    - name: pBuffer
-                      type: buffer *
-                    - name: pBufView
-                      type: buffer view **
-                return: result
             - create texture:
                 params:
                     - name: desc
@@ -978,16 +1079,11 @@ protype:
                     - name: pTexture
                       type: texture **
                 return: result
-            - create texture view:
+            - create fence:
                 params:
-                    - name: desc
-                      type: const texture view desc *
-                    - name: pTexture
-                      type: texture *
-                    - name: pTexView
-                      type: texture view **
+                    - name: ppFence
+                      type: fence **
                 return: result
-            #- create shader
             - wait idle
 
     #device child:
@@ -1097,8 +1193,8 @@ protype:
                       type: const draw indexed instanced desc *
             - present:
                 params:
-                    - name: pSwapChain
-                      type: swap chain *
+                    - name: pDrawable
+                      type: drawable *
 
     - compute command encoder:
         type: interface
@@ -1119,3 +1215,12 @@ protype:
         functions:
           - encoder:
               return: render command encoder *
+
+    - create factory:
+        type: function
+        comment: Create NGFX API factory
+        exported: true
+        params:
+            - name: ppFactory
+              type: factory **
+        return: result

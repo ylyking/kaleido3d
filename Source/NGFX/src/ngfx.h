@@ -25,6 +25,20 @@ SOFTWARE.
 #define __NGFX__
 #include <stdint.h>
 
+#if _WIN32
+  #if defined(LIB_BUILD)
+    #if defined(BUILD_SHARED_LIB)
+      #define NGFX_API __declspec(dllexport)
+    #else
+      #define NGFX_API __declspec(dllimport)
+    #endif
+  #else
+    #define NGFX_API     
+  #endif
+#else
+  #define NGFX_API __attribute__((visibility("default"))) 
+#endif
+
 typedef float    Float32;
 typedef uint32_t Bool32;
 typedef struct { Float32 x,y,z,w; } Float32x4;
@@ -160,6 +174,29 @@ typedef enum ngfxResourceViewType
   NGFX_RESOURCE_VIEW_TYPE_UNORDER_ACCESS_TEXTURE,
   NGFX_RESOURCE_VIEW_TYPE_UNORDER_ACCESS_BUFFER,
 } ngfxResourceViewType;
+
+typedef enum ngfxBufferViewBit
+{
+  NGFX_BUFFER_VIEW_BIT_UNORDERED_ACCESS = 1,
+  NGFX_BUFFER_VIEW_BIT_SHADER_RESOURCE = 2,
+  NGFX_BUFFER_VIEW_BIT_CONSTANT_BUFFER = 4,
+  NGFX_BUFFER_VIEW_BIT_VERTEX_BUFFER = 8,
+} ngfxBufferViewBit;
+
+typedef enum ngfxTextureViewBit
+{
+  NGFX_TEXTURE_VIEW_BIT_SHADER_READ = 1,
+  NGFX_TEXTURE_VIEW_BIT_SHADER_WRITE = 2,
+  NGFX_TEXTURE_VIEW_BIT_RENDER_TARGET = 4,
+  NGFX_TEXTURE_VIEW_BIT_DEPTH_STENCIL = 8,
+} ngfxTextureViewBit;
+
+typedef enum ngfxStorageOption
+{
+  NGFX_STORAGE_OPTION_SHARED,
+  NGFX_STORAGE_OPTION_PRIVATE,
+  NGFX_STORAGE_OPTION_MANAGED,
+} ngfxStorageOption;
 
 typedef enum ngfxTextureDimension
 {
@@ -301,6 +338,7 @@ typedef enum ngfxShaderType
   NGFX_SHADER_TYPE_TESSAILATIONCONTROL,
 } ngfxShaderType;
 
+typedef struct _ngfxShaderLayout* ngfxShaderLayout;
 typedef struct _ngfxSwapChain* ngfxSwapChain;
 typedef struct _ngfxFunction* ngfxFunction;
 typedef struct _ngfxCompiler* ngfxCompiler;
@@ -318,6 +356,7 @@ typedef struct _ngfxBuffer* ngfxBuffer;
 typedef struct _ngfxBufferView* ngfxBufferView;
 typedef struct _ngfxTexture* ngfxTexture;
 typedef struct _ngfxTextureView* ngfxTextureView;
+typedef struct _ngfxDrawable* ngfxDrawable;
 typedef struct _ngfxDevice* ngfxDevice;
 typedef struct _ngfxFence* ngfxFence;
 typedef struct _ngfxFrameBuffer* ngfxFrameBuffer;
@@ -395,6 +434,8 @@ struct ngfxSamplerDesc
 // Description of a buffer
 struct ngfxBufferDesc
 {
+  ngfxBufferViewBit allowedViewBits;
+  ngfxStorageOption option;
   uint64_t size;
 };
 
@@ -411,6 +452,9 @@ struct ngfxBufferViewDesc
 // Description of a texture
 struct ngfxTextureDesc
 {
+  ngfxTextureViewBit allowedViewBits;
+  ngfxStorageOption option;
+  ngfxMultiSampleFlag samples;
   ngfxPixelFormat format;
   uint32_t width;
   uint32_t height;
@@ -462,13 +506,26 @@ struct ngfxRenderPipelineDesc
   ngfxFunction * pixelFunction;
 };
 
-// Description of Pipeline Layout (How to layout bindings)
-struct ngfxPipelineLayoutDesc
+struct ngfxShaderBinding
 {
+  const char * name;
   ngfxShaderStageBit visibility;
   ngfxBindingType bindingType;
   uint32_t slot;
   uint32_t count;
+};
+
+struct ngfxShaderLayoutDesc
+{
+  const ngfxShaderBinding * pShaderBindings;
+  uint32_t count;
+};
+
+// Description of Pipeline Layout (How to layout bindings)
+struct ngfxPipelineLayoutDesc
+{
+  const ngfxShaderLayout * pShaderLayout;
+  uint32_t shaderLayoutCount;
 };
 
 struct ngfxAttachmentDesc
@@ -540,6 +597,8 @@ struct ngfxSwapChainDesc
 
 struct ngfxShaderOption
 {
+  ngfxShaderType stage;
+  ngfxShaderLang language;
   const char * entryName;
   ngfxShaderProfile profile;
   ngfxShaderFormat format;
@@ -684,7 +743,7 @@ public:
   {
     return m_Ptr;
   }
-  NGFXObj** GetAddressOf() const
+  NGFXObj** GetAddressOf()
   {
     return &m_Ptr;
   }
@@ -823,6 +882,29 @@ enum class ResourceViewType : uint32_t
   UnorderAccessTexture,
   UnorderAccessBuffer,
 };// Enum ResourceViewType
+
+enum class BufferViewBit : uint32_t
+{
+  UnOrderedAccess = 1,
+  ShaderResource = 2,
+  ConstantBuffer = 4,
+  VertexBuffer = 8,
+};// Enum BufferViewBit
+
+enum class TextureViewBit : uint32_t
+{
+  ShaderRead = 1,
+  ShaderWrite = 2,
+  RenderTarget = 4,
+  DepthStencil = 8,
+};// Enum TextureViewBit
+
+enum class StorageOption : uint32_t
+{
+  Shared,
+  Private,
+  Managed,
+};// Enum StorageOption
 
 enum class TextureDimension : uint32_t
 {
@@ -964,6 +1046,7 @@ enum class ShaderType : uint32_t
   TessailationControl,
 };// Enum ShaderType
 
+struct ShaderLayout;
 struct SwapChain;
 struct Function;
 struct Compiler;
@@ -981,6 +1064,7 @@ struct Buffer;
 struct BufferView;
 struct Texture;
 struct TextureView;
+struct Drawable;
 struct Device;
 struct Fence;
 struct FrameBuffer;
@@ -1342,11 +1426,27 @@ static_assert(sizeof(SamplerDesc) == sizeof(ngfxSamplerDesc), "SamplerDesc & ngf
 // Description of a buffer
 struct BufferDesc
 {
+  BufferViewBit allowedViewBits;
+  StorageOption option;
   uint64_t size;
 
-  BufferDesc(uint64_t _size)
-  : size(_size)
+  BufferDesc(BufferViewBit _allowedViewBits, StorageOption _option, uint64_t _size)
+  : allowedViewBits(_allowedViewBits)
+  , option(_option)
+  , size(_size)
   {}
+
+  BufferDesc& SetAllowedViewBits(BufferViewBit _allowedViewBits)
+  {
+    allowedViewBits = _allowedViewBits;
+    return *this;
+  }
+
+  BufferDesc& SetOption(StorageOption _option)
+  {
+    option = _option;
+    return *this;
+  }
 
   BufferDesc& SetSize(uint64_t _size)
   {
@@ -1410,6 +1510,9 @@ static_assert(sizeof(BufferViewDesc) == sizeof(ngfxBufferViewDesc), "BufferViewD
 // Description of a texture
 struct TextureDesc
 {
+  TextureViewBit allowedViewBits;
+  StorageOption option;
+  MultiSampleFlag samples;
   PixelFormat format;
   uint32_t width;
   uint32_t height;
@@ -1417,14 +1520,35 @@ struct TextureDesc
   uint32_t layers;
   uint32_t mipLevels;
 
-  TextureDesc(PixelFormat _format, uint32_t _width, uint32_t _height, uint32_t _depth, uint32_t _layers, uint32_t _mipLevels)
-  : format(_format)
+  TextureDesc(TextureViewBit _allowedViewBits, StorageOption _option, MultiSampleFlag _samples, PixelFormat _format, uint32_t _width, uint32_t _height, uint32_t _depth, uint32_t _layers, uint32_t _mipLevels)
+  : allowedViewBits(_allowedViewBits)
+  , option(_option)
+  , samples(_samples)
+  , format(_format)
   , width(_width)
   , height(_height)
   , depth(_depth)
   , layers(_layers)
   , mipLevels(_mipLevels)
   {}
+
+  TextureDesc& SetAllowedViewBits(TextureViewBit _allowedViewBits)
+  {
+    allowedViewBits = _allowedViewBits;
+    return *this;
+  }
+
+  TextureDesc& SetOption(StorageOption _option)
+  {
+    option = _option;
+    return *this;
+  }
+
+  TextureDesc& SetSamples(MultiSampleFlag _samples)
+  {
+    samples = _samples;
+    return *this;
+  }
 
   TextureDesc& SetFormat(PixelFormat _format)
   {
@@ -1673,42 +1797,100 @@ struct RenderPipelineDesc
 
 static_assert(sizeof(RenderPipelineDesc) == sizeof(ngfxRenderPipelineDesc), "RenderPipelineDesc & ngfxRenderPipelineDesc Size Not Equal!");
 
-// Description of Pipeline Layout (How to layout bindings)
-struct PipelineLayoutDesc
+struct ShaderBinding
 {
+  const char * name;
   ShaderStageBit visibility;
   BindingType bindingType;
   uint32_t slot;
   uint32_t count;
 
-  PipelineLayoutDesc(ShaderStageBit _visibility, BindingType _bindingType, uint32_t _slot, uint32_t _count)
-  : visibility(_visibility)
+  ShaderBinding(const char * _name, ShaderStageBit _visibility, BindingType _bindingType, uint32_t _slot, uint32_t _count)
+  : name(_name)
+  , visibility(_visibility)
   , bindingType(_bindingType)
   , slot(_slot)
   , count(_count)
   {}
 
-  PipelineLayoutDesc& SetVisibility(ShaderStageBit _visibility)
+  ShaderBinding& SetName(const char * _name)
+  {
+    name = _name;
+    return *this;
+  }
+
+  ShaderBinding& SetVisibility(ShaderStageBit _visibility)
   {
     visibility = _visibility;
     return *this;
   }
 
-  PipelineLayoutDesc& SetBindingType(BindingType _bindingType)
+  ShaderBinding& SetBindingType(BindingType _bindingType)
   {
     bindingType = _bindingType;
     return *this;
   }
 
-  PipelineLayoutDesc& SetSlot(uint32_t _slot)
+  ShaderBinding& SetSlot(uint32_t _slot)
   {
     slot = _slot;
     return *this;
   }
 
-  PipelineLayoutDesc& SetCount(uint32_t _count)
+  ShaderBinding& SetCount(uint32_t _count)
   {
     count = _count;
+    return *this;
+  }
+};
+
+static_assert(sizeof(ShaderBinding) == sizeof(ngfxShaderBinding), "ShaderBinding & ngfxShaderBinding Size Not Equal!");
+
+struct ShaderLayoutDesc
+{
+  const ShaderBinding * pShaderBindings;
+  uint32_t count;
+
+  ShaderLayoutDesc(const ShaderBinding * _pShaderBindings, uint32_t _count)
+  : pShaderBindings(_pShaderBindings)
+  , count(_count)
+  {}
+
+  ShaderLayoutDesc& SetPShaderBindings(const ShaderBinding * _pShaderBindings)
+  {
+    pShaderBindings = _pShaderBindings;
+    return *this;
+  }
+
+  ShaderLayoutDesc& SetCount(uint32_t _count)
+  {
+    count = _count;
+    return *this;
+  }
+};
+
+static_assert(sizeof(ShaderLayoutDesc) == sizeof(ngfxShaderLayoutDesc), "ShaderLayoutDesc & ngfxShaderLayoutDesc Size Not Equal!");
+
+// Description of Pipeline Layout (How to layout bindings)
+struct PipelineLayoutDesc
+{
+  const ShaderLayout * pShaderLayout;
+  uint32_t shaderLayoutCount;
+
+  PipelineLayoutDesc(const ShaderLayout * _pShaderLayout, uint32_t _shaderLayoutCount)
+  : pShaderLayout(_pShaderLayout)
+  , shaderLayoutCount(_shaderLayoutCount)
+  {}
+
+  PipelineLayoutDesc& SetPShaderLayout(const ShaderLayout * _pShaderLayout)
+  {
+    pShaderLayout = _pShaderLayout;
+    return *this;
+  }
+
+  PipelineLayoutDesc& SetShaderLayoutCount(uint32_t _shaderLayoutCount)
+  {
+    shaderLayoutCount = _shaderLayoutCount;
     return *this;
   }
 };
@@ -2036,15 +2218,31 @@ static_assert(sizeof(SwapChainDesc) == sizeof(ngfxSwapChainDesc), "SwapChainDesc
 
 struct ShaderOption
 {
+  ShaderType stage;
+  ShaderLang language;
   const char * entryName;
   ShaderProfile profile;
   ShaderFormat format;
 
-  ShaderOption(const char * _entryName, ShaderProfile _profile, ShaderFormat _format)
-  : entryName(_entryName)
+  ShaderOption(ShaderType _stage, ShaderLang _language, const char * _entryName, ShaderProfile _profile, ShaderFormat _format)
+  : stage(_stage)
+  , language(_language)
+  , entryName(_entryName)
   , profile(_profile)
   , format(_format)
   {}
+
+  ShaderOption& SetStage(ShaderType _stage)
+  {
+    stage = _stage;
+    return *this;
+  }
+
+  ShaderOption& SetLanguage(ShaderLang _language)
+  {
+    language = _language;
+    return *this;
+  }
 
   ShaderOption& SetEntryName(const char * _entryName)
   {
@@ -2067,11 +2265,17 @@ struct ShaderOption
 
 static_assert(sizeof(ShaderOption) == sizeof(ngfxShaderOption), "ShaderOption & ngfxShaderOption Size Not Equal!");
 
+struct ShaderLayout : public RefCounted<false>
+{
+};
+
 // Present drawables
 struct SwapChain : public NamedObject<false>
 {
+  virtual Drawable * CurrentDrawable() = 0;
+  virtual Drawable * NextDrawable() = 0;
   virtual Result GetTexture(Texture ** ppTexture, uint32_t index) = 0;
-  virtual void Present() = 0;
+  virtual uint32_t BufferCount() = 0;
 };
 
 struct Function : public RefCounted<false>
@@ -2143,6 +2347,7 @@ struct Resource : public NamedObject<true>
 struct Buffer : public Resource
 {
   virtual Result GetDesc(BufferDesc * pDesc) = 0;
+  virtual Result CreateView(const BufferViewDesc * pDesc, BufferView ** ppView) = 0;
 };
 
 struct BufferView : public NamedObject<false>
@@ -2152,10 +2357,16 @@ struct BufferView : public NamedObject<false>
 struct Texture : public Resource
 {
   virtual Result GetDesc(TextureDesc * pDesc) = 0;
+  virtual Result CreateView(const TextureViewDesc * pDesc, TextureView ** ppView) = 0;
 };
 
 struct TextureView : public NamedObject<false>
 {
+};
+
+struct Drawable : public RefCounted<true>
+{
+  virtual Texture * Texture() = 0;
 };
 
 // Gpu device
@@ -2163,6 +2374,7 @@ struct Device : public NamedObject<true>
 {
   virtual void GetDesc(DeviceDesc * pDesc) = 0;
   virtual Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) = 0;
+  virtual Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) = 0;
   virtual Result CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) = 0;
   virtual Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) = 0;
   virtual Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
@@ -2171,9 +2383,8 @@ struct Device : public NamedObject<true>
   virtual Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) = 0;
   virtual Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) = 0;
   virtual Result CreateBuffer(const BufferDesc* desc, Buffer ** pBuffer) = 0;
-  virtual Result CreateBufferView(const BufferViewDesc * desc, Buffer * pBuffer, BufferView ** pBufView) = 0;
   virtual Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) = 0;
-  virtual Result CreateTextureView(const TextureViewDesc * desc, Texture * pTexture, TextureView ** pTexView) = 0;
+  virtual Result CreateFence(Fence ** ppFence) = 0;
   virtual void WaitIdle() = 0;
 };
 
@@ -2221,7 +2432,7 @@ struct RenderCommandEncoder : public CommandEncoder
   virtual void SetPrimitiveType(PrimitiveType primitive) = 0;
   virtual void DrawInstanced(const DrawInstancedDesc * drawParam) = 0;
   virtual void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam) = 0;
-  virtual void Present(SwapChain * pSwapChain) = 0;
+  virtual void Present(Drawable * pDrawable) = 0;
 };
 
 struct ComputeCommandEncoder : public CommandEncoder
@@ -2233,6 +2444,8 @@ struct ParallelRenderCommandEncoder : public CommandEncoder
 {
   virtual RenderCommandEncoder * Encoder() = 0;
 };
+
+Result NGFX_API CreateFactory(Factory ** ppFactory);
 
 } // namespace ngfx
 #endif // __cplusplus
