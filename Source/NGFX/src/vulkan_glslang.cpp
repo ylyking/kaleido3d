@@ -185,11 +185,15 @@ ngfx::Result GlslangCompiler::Compile(const ngfx::ShaderOption * option, void * 
       puts(program.getInfoDebugLog());
       return Result::Failed;
     }
-    std::vector<unsigned int> spirv;
-    GlslangToSpv(*program.getIntermediate(stage), spirv);
 
     if (program.buildReflection())
     {
+      auto function = new VulkanFunction();
+      function->EntryName = option->entryName;
+      GlslangToSpv(*program.getIntermediate(stage), function->ByteCodes);
+      function->ShaderModuleInfo.codeSize = function->ByteCodes.size() * sizeof(uint32_t);
+      function->ShaderModuleInfo.pCode = function->ByteCodes.data();
+      *output = function;
     }
     else
     {
@@ -205,5 +209,38 @@ ngfx::Result GlslangCompiler::Compile(const ngfx::ShaderOption * option, void * 
 
 ngfx::Result GlslangCompiler::Reflect(void * pData, uint32_t size)
 {
-  return ngfx::Result();
+  return Result::Ok;
+}
+
+VulkanFunction::VulkanFunction()
+{
+}
+
+VulkanFunction::~VulkanFunction()
+{
+  if (ShaderModule)
+  {
+    //vkDestroyShaderModule(VK_NULL_HANDLE, ShaderModule, nullptr);
+  }
+}
+
+ngfx::ShaderType VulkanFunction::Type()
+{
+  return ShaderType;
+}
+
+const char * VulkanFunction::Name()
+{
+  return EntryName.c_str();
+}
+
+VkPipelineShaderStageCreateInfo* 
+VulkanFunction::GetPipelineStageInfo()
+{
+  StageInfo.module = ShaderModule;
+  StageInfo.pName = EntryName.c_str();
+  StageInfo.flags;
+  StageInfo.stage;
+  //StageInfo.pSpecializationInfo;
+  return &StageInfo;
 }

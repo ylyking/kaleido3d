@@ -221,9 +221,18 @@ class TemplateGenerator(object):
             
             self.__header__.write(api_def)
 
-            self.__header__.write('\ntypedef float    Float32;'
-                                  '\ntypedef uint32_t Bool32;'
-                                  '\ntypedef struct { Float32 x,y,z,w; } Float32x4;\n')
+            self.__header__.write(
+'''
+typedef float    Float32;
+typedef uint32_t Bool32;
+typedef struct   Float32x4 { Float32 x,y,z,w;
+#if __cplusplus
+                 Float32x4(Float32 _x = 0, Float32 _y = 0, Float32 _z = 0, Float32 _w = 0)
+                 : x(_x), y(_y), z(_z), w(_w) {}
+#endif
+                 } Float32x4;
+'''
+              )
 
             if templ.__cpp__:
                 self.__header__.write('\nnamespace {0}\n{{'.format(self.ns))
@@ -472,8 +481,24 @@ class TemplateGenerator(object):
             self.__header__.write('\n// {0}'.format(struct['val']['comment']))
 
         r_struct_name = NameUtil['cpp_struct' if is_cpp else 'struct'](self.ns, struct_name)
-
-        self.__header__.write('\nstruct {0}\n{{\n'.format(r_struct_name))
+        has_inherit = 'inherit' in struct['val']
+        inherit_type = None
+        inherit_type_tree = None;
+        if is_cpp:
+          if has_inherit:
+            inherit_type = NameUtil['cpp_struct'](self.ns, struct['val']['inherit'])
+            inherit_type_tree = self.type_tree[self.ns]['struct'][struct['val']['inherit']]['members']
+            self.__header__.write('\nstruct {0} : public {1}\n{{\n'.format(r_struct_name, inherit_type))
+          else:
+            self.__header__.write('\nstruct {0}\n{{\n'.format(r_struct_name))
+        else:
+          self.__header__.write('\nstruct {0}\n{{\n'.format(r_struct_name))
+          if has_inherit:
+            inherit_type_tree = self.type_tree[self.ns]['struct'][struct['val']['inherit']]['members']
+            tmp_list = []
+            tmp_list.extend(inherit_type_tree)
+            tmp_list.extend(struct_members)
+            struct_members = tmp_list
 
         member_setters = []
         #member_params = []
@@ -483,12 +508,12 @@ class TemplateGenerator(object):
             if not member:
                 continue
             member_type = member['type']
+            def_val = self.getDefaultValue(member_type)
             member_name = member['name']
             if member_type in self.content:
                 member_type = NameUtil[('cpp_' + self.content[member_type]) if is_cpp else self.content[member_type]](self.ns, member_type)
             elif not self.isBasicType(member_type):
                 member_type = self.get_real_type_name(member_type, self.ns, is_cpp)
-
 
             self.__header__.write('  {0} {1};\n'.format(member_type, member_name))
 
@@ -504,16 +529,25 @@ class TemplateGenerator(object):
                 sub_member = member_name.split(',')
                 for sub in sub_member:
                     r_sub = self.stripHeadSpace(sub)
-                    member_params_str.append(' '.join([member_type, '_' + r_sub]))
+                    if def_val:
+                      member_params_str.append(' '.join([member_type, '_' + r_sub]) + ' = ' + def_val)
+                    else:
+                      member_params_str.append(' '.join([member_type, '_' + r_sub]))
                     init_list_str.append('{0}(_{0})'.format(r_sub))
             else:
-                member_params_str.append(' '.join([member_type, '_' + member_name]))
+                if def_val:
+                  member_params_str.append(' '.join([member_type, '_' + member_name]) + ' = ' + def_val)
+                else:
+                  member_params_str.append(' '.join([member_type, '_' + member_name]))
                 init_list_str.append('{0}(_{0})'.format(member_name))
 
         if is_cpp:
             #self.__header__.write('#if __cplusplus\n')
             # write constructor
-            self.__header__.write('\n  {0}({1})\n  : {2}\n  {{}}\n'.format(r_struct_name, ', '.join(member_params_str), '\n  , '.join(init_list_str)))
+            if has_inherit:
+              self.__header__.write('\n  {0}({1})\n  : {2}\n  , {3}\n  {{}}\n'.format(r_struct_name, ', '.join(member_params_str), inherit_type+'()', '\n  , '.join(init_list_str)))
+            else:
+              self.__header__.write('\n  {0}({1})\n  : {2}\n  {{}}\n'.format(r_struct_name, ', '.join(member_params_str), '\n  , '.join(init_list_str)))
             # write member function
             for setter in member_setters:
                 if ',' in setter['param'][1]:
@@ -540,8 +574,30 @@ class TemplateGenerator(object):
             self.__header__.write('\nstatic_assert(sizeof({0}) == sizeof({1}), \"{0} & {1} Size Not Equal!\");\n'.format(r_struct_name, NameUtil['struct'](self.ns, struct_name)))
 
     def isBasicType(self, t):
-        basicType = ['uint32_t', 'uint64_t', 'float32', 'bool', 'float', 'int32_t']
+        basicType = ['uint32_t', 'uint64_t', 'float32', 'bool', 'float', 'int32_t', 'Bool32', 'Float32']
         return t in basicType
+
+    def getDefaultValue(self, _type):
+      if self.isBasicType(_type):
+        return '0'
+      elif _type.endswith('*'):
+        return 'nullptr'
+      elif _type in ['Float32x4']:
+        return 'Float32x4()'
+      else: # enum value ?
+        stat = ''
+        if _type in self.type_tree[self.ns]['enum']:
+          default_val = self.type_tree[self.ns]['enum'][_type]['enums'][0]
+          default_val_t_name = NameUtil['cpp_enum'](self.ns, _type)
+          if isinstance(default_val, dict):
+            stat = '::'.join([default_val_t_name, make_name_AxxBxx(default_val.keys()[0])])
+          else:
+            stat = '::'.join([default_val_t_name, make_name_AxxBxx(default_val)])
+        elif _type in self.type_tree[self.ns]['struct']:
+          stat = NameUtil['cpp_struct'](self.ns, _type) + '()'
+        else:
+          stat = _type
+        return stat
 
     def stripHeadSpace(self, str_):
         if str_ and str_[0:1] == ' ':

@@ -29,10 +29,10 @@ protected:
 
 private:
   k3d::SharedPtr<k3d::IVkRHI> RHI;
-  k3d::NGFXDeviceRef Device;
-  k3d::NGFXSwapChainRef Swapchain;
-  k3d::NGFXCommandQueueRef Queue;
-  k3d::NGFXFenceRef FrameFence;
+  NGFXDeviceRef Device;
+  NGFXSwapChainRef Swapchain;
+  NGFXCommandQueueRef Queue;
+  NGFXFenceRef FrameFence;
 };
 
 #endif // RENDERERWIDGET_H

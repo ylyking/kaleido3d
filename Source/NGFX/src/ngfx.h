@@ -41,7 +41,12 @@ SOFTWARE.
 
 typedef float    Float32;
 typedef uint32_t Bool32;
-typedef struct { Float32 x,y,z,w; } Float32x4;
+typedef struct   Float32x4 { Float32 x,y,z,w;
+#if __cplusplus
+                 Float32x4(Float32 _x = 0, Float32 _y = 0, Float32 _z = 0, Float32 _w = 0)
+                 : x(_x), y(_y), z(_z), w(_w) {}
+#endif
+                 } Float32x4;
 
 // Result of every call
 typedef enum ngfxResult
@@ -325,6 +330,7 @@ typedef enum ngfxCommandQueueType
 {
   NGFX_COMMAND_QUEUE_TYPE_GRAPHICS,
   NGFX_COMMAND_QUEUE_TYPE_COMPUTE,
+  NGFX_COMMAND_QUEUE_TYPE_COPY,
 } ngfxCommandQueueType;
 
 // Type of shader
@@ -363,6 +369,7 @@ typedef struct _ngfxFrameBuffer* ngfxFrameBuffer;
 typedef struct _ngfxCommandQueue* ngfxCommandQueue;
 typedef struct _ngfxCommandBuffer* ngfxCommandBuffer;
 typedef struct _ngfxCommandEncoder* ngfxCommandEncoder;
+typedef struct _ngfxCopyCommandEncoder* ngfxCopyCommandEncoder;
 typedef struct _ngfxRenderCommandEncoder* ngfxRenderCommandEncoder;
 typedef struct _ngfxComputeCommandEncoder* ngfxComputeCommandEncoder;
 typedef struct _ngfxParallelRenderCommandEncoder* ngfxParallelRenderCommandEncoder;
@@ -537,11 +544,17 @@ struct ngfxAttachmentDesc
 
 struct ngfxColorAttachmentDesc
 {
+  ngfxLoadAction loadAction;
+  ngfxStoreAction storeAction;
+  ngfxTexture * texture;
   Float32x4 clearColor;
 };
 
 struct ngfxDepthStencilAttachmentDesc
 {
+  ngfxLoadAction loadAction;
+  ngfxStoreAction storeAction;
+  ngfxTexture * texture;
   Float32 clearDepth;
   int32_t clearStencil;
 };
@@ -1033,6 +1046,7 @@ enum class CommandQueueType : uint32_t
 {
   Graphics,
   Compute,
+  Copy,
 };// Enum CommandQueueType
 
 // Type of shader
@@ -1071,6 +1085,7 @@ struct FrameBuffer;
 struct CommandQueue;
 struct CommandBuffer;
 struct CommandEncoder;
+struct CopyCommandEncoder;
 struct RenderCommandEncoder;
 struct ComputeCommandEncoder;
 struct ParallelRenderCommandEncoder;
@@ -1082,7 +1097,7 @@ struct DepthStencilOp
   StencilOperation stencilPassOp;
   ComparisonFunction stencilFunc;
 
-  DepthStencilOp(StencilOperation _stencilFailOp, StencilOperation _depthStencilFailOp, StencilOperation _stencilPassOp, ComparisonFunction _stencilFunc)
+  DepthStencilOp(StencilOperation _stencilFailOp = StencilOperation::Keep, StencilOperation _depthStencilFailOp = StencilOperation::Keep, StencilOperation _stencilPassOp = StencilOperation::Keep, ComparisonFunction _stencilFunc = ComparisonFunction::Never)
   : stencilFailOp(_stencilFailOp)
   , depthStencilFailOp(_depthStencilFailOp)
   , stencilPassOp(_stencilPassOp)
@@ -1124,7 +1139,7 @@ struct RasterizerState
   int32_t depthBias;
   Bool32 multiSampleEnable;
 
-  RasterizerState(FillMode _fillMode, CullMode _cullMode, Bool32 _frontCCW, int32_t _depthBias, Bool32 _multiSampleEnable)
+  RasterizerState(FillMode _fillMode = FillMode::Wire, CullMode _cullMode = CullMode::None, Bool32 _frontCCW = 0, int32_t _depthBias = 0, Bool32 _multiSampleEnable = 0)
   : fillMode(_fillMode)
   , cullMode(_cullMode)
   , frontCCW(_frontCCW)
@@ -1176,7 +1191,7 @@ struct BlendState
   BlendOperation alphaBlendOp;
   uint32_t colorWriteMask;
 
-  BlendState(Bool32 _enable, BlendType _srcColorBlend, BlendType _destColorBlend, BlendOperation _colorBlendOp, BlendType _srcAlphaBlend, BlendType _destAlphaBlend, BlendOperation _alphaBlendOp, uint32_t _colorWriteMask)
+  BlendState(Bool32 _enable = 0, BlendType _srcColorBlend = BlendType::Zero, BlendType _destColorBlend = BlendType::Zero, BlendOperation _colorBlendOp = BlendOperation::Add, BlendType _srcAlphaBlend = BlendType::Zero, BlendType _destAlphaBlend = BlendType::Zero, BlendOperation _alphaBlendOp = BlendOperation::Add, uint32_t _colorWriteMask = 0)
   : enable(_enable)
   , srcColorBlend(_srcColorBlend)
   , destColorBlend(_destColorBlend)
@@ -1247,7 +1262,7 @@ struct DepthStencilState
   DepthStencilOp frontFace;
   DepthStencilOp backFace;
 
-  DepthStencilState(Bool32 _depthEnable, DepthWriteMask _depthWriteMask, ComparisonFunction _depthFunc, Bool32 _stencilEnable, DepthStencilOp _frontFace, DepthStencilOp _backFace)
+  DepthStencilState(Bool32 _depthEnable = 0, DepthWriteMask _depthWriteMask = DepthWriteMask::Zero, ComparisonFunction _depthFunc = ComparisonFunction::Never, Bool32 _stencilEnable = 0, DepthStencilOp _frontFace = DepthStencilOp(), DepthStencilOp _backFace = DepthStencilOp())
   : depthEnable(_depthEnable)
   , depthWriteMask(_depthWriteMask)
   , depthFunc(_depthFunc)
@@ -1300,7 +1315,7 @@ struct DeviceDesc
   uint64_t maxAllocation;
   char * vendorName;
 
-  DeviceDesc(uint64_t _maxAllocation, char * _vendorName)
+  DeviceDesc(uint64_t _maxAllocation = 0, char * _vendorName = nullptr)
   : maxAllocation(_maxAllocation)
   , vendorName(_vendorName)
   {}
@@ -1326,7 +1341,7 @@ struct Filter
   FilterMode magFilter;
   FilterMode mipMapFilter;
 
-  Filter(FilterMode _minFilter, FilterMode _magFilter, FilterMode _mipMapFilter)
+  Filter(FilterMode _minFilter = FilterMode::Point, FilterMode _magFilter = FilterMode::Point, FilterMode _mipMapFilter = FilterMode::Point)
   : minFilter(_minFilter)
   , magFilter(_magFilter)
   , mipMapFilter(_mipMapFilter)
@@ -1364,7 +1379,7 @@ struct SamplerDesc
   Float32 minLod;
   Float32 maxLod;
 
-  SamplerDesc(Filter _filter, AddressMode _U, AddressMode _V, AddressMode _W, Float32 _mipLodBias, uint32_t _maxAnistropy, ComparisonFunction _comparisonFunc, Float32 _minLod, Float32 _maxLod)
+  SamplerDesc(Filter _filter = Filter(), AddressMode _U = AddressMode::Wrap, AddressMode _V = AddressMode::Wrap, AddressMode _W = AddressMode::Wrap, Float32 _mipLodBias = 0, uint32_t _maxAnistropy = 0, ComparisonFunction _comparisonFunc = ComparisonFunction::Never, Float32 _minLod = 0, Float32 _maxLod = 0)
   : filter(_filter)
   , U(_U)
   , V(_V)
@@ -1430,7 +1445,7 @@ struct BufferDesc
   StorageOption option;
   uint64_t size;
 
-  BufferDesc(BufferViewBit _allowedViewBits, StorageOption _option, uint64_t _size)
+  BufferDesc(BufferViewBit _allowedViewBits = BufferViewBit::UnOrderedAccess, StorageOption _option = StorageOption::Shared, uint64_t _size = 0)
   : allowedViewBits(_allowedViewBits)
   , option(_option)
   , size(_size)
@@ -1466,7 +1481,7 @@ struct BufferViewDesc
   uint64_t offset;
   uint64_t stride;
 
-  BufferViewDesc(ResourceViewType _view, ResourceState _state, uint64_t _size, uint64_t _offset, uint64_t _stride)
+  BufferViewDesc(ResourceViewType _view = ResourceViewType::LinearBuffer, ResourceState _state = ResourceState::Common, uint64_t _size = 0, uint64_t _offset = 0, uint64_t _stride = 0)
   : view(_view)
   , state(_state)
   , size(_size)
@@ -1520,7 +1535,7 @@ struct TextureDesc
   uint32_t layers;
   uint32_t mipLevels;
 
-  TextureDesc(TextureViewBit _allowedViewBits, StorageOption _option, MultiSampleFlag _samples, PixelFormat _format, uint32_t _width, uint32_t _height, uint32_t _depth, uint32_t _layers, uint32_t _mipLevels)
+  TextureDesc(TextureViewBit _allowedViewBits = TextureViewBit::ShaderRead, StorageOption _option = StorageOption::Shared, MultiSampleFlag _samples = MultiSampleFlag::MS1x, PixelFormat _format = PixelFormat::RGBA16Uint, uint32_t _width = 0, uint32_t _height = 0, uint32_t _depth = 0, uint32_t _layers = 0, uint32_t _mipLevels = 0)
   : allowedViewBits(_allowedViewBits)
   , option(_option)
   , samples(_samples)
@@ -1597,7 +1612,7 @@ struct TextureViewDesc
   TextureDimension dimension;
   uint32_t mipLevel;
 
-  TextureViewDesc(ResourceViewType _view, ResourceState _state, TextureDimension _dimension, uint32_t _mipLevel)
+  TextureViewDesc(ResourceViewType _view = ResourceViewType::LinearBuffer, ResourceState _state = ResourceState::Common, TextureDimension _dimension = TextureDimension::Tex1D, uint32_t _mipLevel = 0)
   : view(_view)
   , state(_state)
   , dimension(_dimension)
@@ -1636,7 +1651,7 @@ struct VertexLayout
   VertexInputRate rate;
   uint32_t stride;
 
-  VertexLayout(VertexInputRate _rate, uint32_t _stride)
+  VertexLayout(VertexInputRate _rate = VertexInputRate::PerVertex, uint32_t _stride = 0)
   : rate(_rate)
   , stride(_stride)
   {}
@@ -1662,7 +1677,7 @@ struct VertexAttribute
   uint32_t offset;
   uint32_t slot;
 
-  VertexAttribute(VertexFormat _format, uint32_t _offset, uint32_t _slot)
+  VertexAttribute(VertexFormat _format = VertexFormat::F32C, uint32_t _offset = 0, uint32_t _slot = 0)
   : format(_format)
   , offset(_offset)
   , slot(_slot)
@@ -1697,7 +1712,7 @@ struct VertexInputState
   const VertexLayout * pLayouts;
   uint32_t layoutCount;
 
-  VertexInputState(const VertexAttribute * _pAttributes, uint32_t _attributeCount, const VertexLayout * _pLayouts, uint32_t _layoutCount)
+  VertexInputState(const VertexAttribute * _pAttributes = nullptr, uint32_t _attributeCount = 0, const VertexLayout * _pLayouts = nullptr, uint32_t _layoutCount = 0)
   : pAttributes(_pAttributes)
   , attributeCount(_attributeCount)
   , pLayouts(_pLayouts)
@@ -1742,7 +1757,7 @@ struct RenderPipelineDesc
   Function * vertexFunction;
   Function * pixelFunction;
 
-  RenderPipelineDesc(RasterizerState _rasterState, BlendState _blendState, DepthStencilState _depthStencil, VertexInputState _inputState, PrimitiveType _primitiveTopology, Function * _vertexFunction, Function * _pixelFunction)
+  RenderPipelineDesc(RasterizerState _rasterState = RasterizerState(), BlendState _blendState = BlendState(), DepthStencilState _depthStencil = DepthStencilState(), VertexInputState _inputState = VertexInputState(), PrimitiveType _primitiveTopology = PrimitiveType::Points, Function * _vertexFunction = nullptr, Function * _pixelFunction = nullptr)
   : rasterState(_rasterState)
   , blendState(_blendState)
   , depthStencil(_depthStencil)
@@ -1805,7 +1820,7 @@ struct ShaderBinding
   uint32_t slot;
   uint32_t count;
 
-  ShaderBinding(const char * _name, ShaderStageBit _visibility, BindingType _bindingType, uint32_t _slot, uint32_t _count)
+  ShaderBinding(const char * _name = nullptr, ShaderStageBit _visibility = ShaderStageBit::Vertex, BindingType _bindingType = BindingType::UniformBuffer, uint32_t _slot = 0, uint32_t _count = 0)
   : name(_name)
   , visibility(_visibility)
   , bindingType(_bindingType)
@@ -1851,7 +1866,7 @@ struct ShaderLayoutDesc
   const ShaderBinding * pShaderBindings;
   uint32_t count;
 
-  ShaderLayoutDesc(const ShaderBinding * _pShaderBindings, uint32_t _count)
+  ShaderLayoutDesc(const ShaderBinding * _pShaderBindings = nullptr, uint32_t _count = 0)
   : pShaderBindings(_pShaderBindings)
   , count(_count)
   {}
@@ -1877,7 +1892,7 @@ struct PipelineLayoutDesc
   const ShaderLayout * pShaderLayout;
   uint32_t shaderLayoutCount;
 
-  PipelineLayoutDesc(const ShaderLayout * _pShaderLayout, uint32_t _shaderLayoutCount)
+  PipelineLayoutDesc(const ShaderLayout * _pShaderLayout = nullptr, uint32_t _shaderLayoutCount = 0)
   : pShaderLayout(_pShaderLayout)
   , shaderLayoutCount(_shaderLayoutCount)
   {}
@@ -1903,7 +1918,7 @@ struct AttachmentDesc
   StoreAction storeAction;
   Texture * texture;
 
-  AttachmentDesc(LoadAction _loadAction, StoreAction _storeAction, Texture * _texture)
+  AttachmentDesc(LoadAction _loadAction = LoadAction::Load, StoreAction _storeAction = StoreAction::Store, Texture * _texture = nullptr)
   : loadAction(_loadAction)
   , storeAction(_storeAction)
   , texture(_texture)
@@ -1930,12 +1945,13 @@ struct AttachmentDesc
 
 static_assert(sizeof(AttachmentDesc) == sizeof(ngfxAttachmentDesc), "AttachmentDesc & ngfxAttachmentDesc Size Not Equal!");
 
-struct ColorAttachmentDesc
+struct ColorAttachmentDesc : public AttachmentDesc
 {
   Float32x4 clearColor;
 
-  ColorAttachmentDesc(Float32x4 _clearColor)
-  : clearColor(_clearColor)
+  ColorAttachmentDesc(Float32x4 _clearColor = Float32x4())
+  : AttachmentDesc()
+  , clearColor(_clearColor)
   {}
 
   ColorAttachmentDesc& SetClearColor(Float32x4 _clearColor)
@@ -1947,13 +1963,14 @@ struct ColorAttachmentDesc
 
 static_assert(sizeof(ColorAttachmentDesc) == sizeof(ngfxColorAttachmentDesc), "ColorAttachmentDesc & ngfxColorAttachmentDesc Size Not Equal!");
 
-struct DepthStencilAttachmentDesc
+struct DepthStencilAttachmentDesc : public AttachmentDesc
 {
   Float32 clearDepth;
   int32_t clearStencil;
 
-  DepthStencilAttachmentDesc(Float32 _clearDepth, int32_t _clearStencil)
-  : clearDepth(_clearDepth)
+  DepthStencilAttachmentDesc(Float32 _clearDepth = 0, int32_t _clearStencil = 0)
+  : AttachmentDesc()
+  , clearDepth(_clearDepth)
   , clearStencil(_clearStencil)
   {}
 
@@ -1979,7 +1996,7 @@ struct RenderPassDesc
   int32_t colorAttachmentsCount;
   DepthStencilAttachmentDesc * pDepthStencilAttachment;
 
-  RenderPassDesc(ColorAttachmentDesc * _pColorAttachments, int32_t _colorAttachmentsCount, DepthStencilAttachmentDesc * _pDepthStencilAttachment)
+  RenderPassDesc(ColorAttachmentDesc * _pColorAttachments = nullptr, int32_t _colorAttachmentsCount = 0, DepthStencilAttachmentDesc * _pDepthStencilAttachment = nullptr)
   : pColorAttachments(_pColorAttachments)
   , colorAttachmentsCount(_colorAttachmentsCount)
   , pDepthStencilAttachment(_pDepthStencilAttachment)
@@ -2011,7 +2028,7 @@ struct RenderTargetDesc
 {
   int32_t XX;
 
-  RenderTargetDesc(int32_t _XX)
+  RenderTargetDesc(int32_t _XX = 0)
   : XX(_XX)
   {}
 
@@ -2032,7 +2049,7 @@ struct DrawIndexedInstancedDesc
   uint32_t baseVertexId;
   uint32_t startInstanceId;
 
-  DrawIndexedInstancedDesc(uint32_t _indexCountPerInstance, uint32_t _instanceCount, uint32_t _startId, uint32_t _baseVertexId, uint32_t _startInstanceId)
+  DrawIndexedInstancedDesc(uint32_t _indexCountPerInstance = 0, uint32_t _instanceCount = 0, uint32_t _startId = 0, uint32_t _baseVertexId = 0, uint32_t _startInstanceId = 0)
   : indexCountPerInstance(_indexCountPerInstance)
   , instanceCount(_instanceCount)
   , startId(_startId)
@@ -2080,7 +2097,7 @@ struct DrawInstancedDesc
   uint32_t startVertexId;
   uint32_t startInstanceId;
 
-  DrawInstancedDesc(uint32_t _vertexCountPerInstance, uint32_t _instanceCount, uint32_t _startVertexId, uint32_t _startInstanceId)
+  DrawInstancedDesc(uint32_t _vertexCountPerInstance = 0, uint32_t _instanceCount = 0, uint32_t _startVertexId = 0, uint32_t _startInstanceId = 0)
   : vertexCountPerInstance(_vertexCountPerInstance)
   , instanceCount(_instanceCount)
   , startVertexId(_startVertexId)
@@ -2121,7 +2138,7 @@ struct Viewport
   Float32 minDepth;
   Float32 maxDepth;
 
-  Viewport(Float32 _left, Float32 _top, Float32 _width, Float32 _height, Float32 _minDepth, Float32 _maxDepth)
+  Viewport(Float32 _left = 0, Float32 _top = 0, Float32 _width = 0, Float32 _height = 0, Float32 _minDepth = 0, Float32 _maxDepth = 0)
   : left(_left)
   , top(_top)
   , width(_width)
@@ -2168,7 +2185,7 @@ struct SwapChainDesc
   Bool32 hasDepthStencilTarget;
   PixelFormat depthStencilFormat;
 
-  SwapChainDesc(PixelFormat _pixelFormat, uint32_t _width, uint32_t _height, uint32_t _numColorBuffers, Bool32 _hasDepthStencilTarget, PixelFormat _depthStencilFormat)
+  SwapChainDesc(PixelFormat _pixelFormat = PixelFormat::RGBA16Uint, uint32_t _width = 0, uint32_t _height = 0, uint32_t _numColorBuffers = 0, Bool32 _hasDepthStencilTarget = 0, PixelFormat _depthStencilFormat = PixelFormat::RGBA16Uint)
   : pixelFormat(_pixelFormat)
   , width(_width)
   , height(_height)
@@ -2224,7 +2241,7 @@ struct ShaderOption
   ShaderProfile profile;
   ShaderFormat format;
 
-  ShaderOption(ShaderType _stage, ShaderLang _language, const char * _entryName, ShaderProfile _profile, ShaderFormat _format)
+  ShaderOption(ShaderType _stage = ShaderType::Vertex, ShaderLang _language = ShaderLang::HLSL, const char * _entryName = nullptr, ShaderProfile _profile = ShaderProfile::SM4, ShaderFormat _format = ShaderFormat::Text)
   : stage(_stage)
   , language(_language)
   , entryName(_entryName)
@@ -2276,6 +2293,7 @@ struct SwapChain : public NamedObject<false>
   virtual Drawable * NextDrawable() = 0;
   virtual Result GetTexture(Texture ** ppTexture, uint32_t index) = 0;
   virtual uint32_t BufferCount() = 0;
+  virtual void InitWithRenderPass(RenderPass * pRenderPass) = 0;
 };
 
 struct Function : public RefCounted<false>
@@ -2407,19 +2425,26 @@ struct CommandQueue : public NamedObject<true>
 struct CommandBuffer : public NamedObject<true>
 {
   virtual void Commit(Fence * pFence) = 0;
-  virtual RenderCommandEncoder * RenderCommandEncoder() = 0;
+  virtual RenderCommandEncoder * RenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass) = 0;
   virtual ComputeCommandEncoder * ComputeCommandEncoder() = 0;
+  virtual CopyCommandEncoder * CopyCommandEncoder() = 0;
   virtual ParallelRenderCommandEncoder * ParallelCommandEncoder() = 0;
 };
 
 struct CommandEncoder : public NamedObject<true>
 {
-  virtual void CopyTexture() = 0;
-  virtual void CopyBuffer() = 0;
+  virtual void Barrier(Resource * pResource) = 0;
   virtual void SetPipeline(Pipeline* pPipelineState) = 0;
   virtual void SetPipelineLayout(PipelineLayout * pPipelineLayout) = 0;
   virtual void SetBindingTable(BindingTable * pBindingTable) = 0;
   virtual void EndEncode() = 0;
+};
+
+// Command Encoder used for Copy and Blit
+struct CopyCommandEncoder : public CommandEncoder
+{
+  virtual void CopyTexture() = 0;
+  virtual void CopyBuffer(uint64_t srcOffset, uint64_t dstOffset, uint64_t size, Buffer * srcBuffer, Buffer * dstBuffer) = 0;
 };
 
 // Render Command Encoder
@@ -2445,7 +2470,7 @@ struct ParallelRenderCommandEncoder : public CommandEncoder
   virtual RenderCommandEncoder * Encoder() = 0;
 };
 
-Result NGFX_API CreateFactory(Factory ** ppFactory);
+Result NGFX_API CreateFactory(Factory ** ppFactory, bool debugEnabled);
 
 } // namespace ngfx
 #endif // __cplusplus

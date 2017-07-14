@@ -11,10 +11,107 @@
 #include "ngfx.h"
 #include "vulkan_glslang.h"
 #include <vector>
+#include <set>
 
 using namespace ngfx;
 
 #define VULKAN_ALLOCATOR nullptr
+
+static const char* RequiredLayers[] = 
+{ 
+  "VK_LAYER_LUNARG_standard_validation" 
+};
+
+static std::vector<const char*> RequiredInstanceExtensions =
+{
+  VK_KHR_SURFACE_EXTENSION_NAME,
+  VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+};
+
+static std::vector<const char *> RequiredDeviceExtensions = 
+{ 
+  VK_KHR_SWAPCHAIN_EXTENSION_NAME 
+};
+
+enum class Log
+{
+  Debug,
+  Info,
+  Warn,
+  Error,
+};
+
+void LogPrint(Log const& i, const char* Tag, const char* Fmt, ...)
+{
+#if K3DPLATFORM_OS_WIN
+  static char Buffer[1024] = { 0 };
+  va_list va;
+  va_start(va, Fmt);
+  vsnprintf_s(Buffer, 1024, Fmt, va);
+  va_end(va);
+  OutputDebugStringA(Buffer);
+#endif
+}
+
+const char * VulkanError(VkResult Result)
+{
+#define ERROR_STR(X) case VK_##X: return #X;
+  switch(Result)
+  {
+    ERROR_STR(SUCCESS)
+    ERROR_STR(NOT_READY)
+    ERROR_STR(TIMEOUT)
+    ERROR_STR(EVENT_SET)
+    ERROR_STR(EVENT_RESET)
+    ERROR_STR(INCOMPLETE)
+    ERROR_STR(ERROR_OUT_OF_HOST_MEMORY)
+    ERROR_STR(ERROR_OUT_OF_DEVICE_MEMORY)
+    ERROR_STR(ERROR_INITIALIZATION_FAILED)
+    ERROR_STR(ERROR_DEVICE_LOST)
+    ERROR_STR(ERROR_LAYER_NOT_PRESENT)
+    ERROR_STR(ERROR_EXTENSION_NOT_PRESENT)
+    ERROR_STR(ERROR_MEMORY_MAP_FAILED)
+    ERROR_STR(ERROR_FEATURE_NOT_PRESENT)
+    ERROR_STR(ERROR_INCOMPATIBLE_DRIVER)
+    ERROR_STR(ERROR_TOO_MANY_OBJECTS)
+    ERROR_STR(ERROR_FORMAT_NOT_SUPPORTED)
+    ERROR_STR(ERROR_FRAGMENTED_POOL)
+    ERROR_STR(ERROR_SURFACE_LOST_KHR)
+    ERROR_STR(ERROR_NATIVE_WINDOW_IN_USE_KHR)
+    ERROR_STR(ERROR_OUT_OF_DATE_KHR)
+    ERROR_STR(ERROR_INCOMPATIBLE_DISPLAY_KHR)
+    ERROR_STR(ERROR_VALIDATION_FAILED_EXT)
+    ERROR_STR(ERROR_OUT_OF_POOL_MEMORY_KHR)
+    ERROR_STR(ERROR_INVALID_EXTERNAL_HANDLE_KHX)
+  }
+  return "Unknown";
+#undef ERROR_STR
+}
+
+const char* DeviceType(VkPhysicalDeviceType DType)
+{
+  switch (DType)
+  {
+  case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+    return "Discrete GPU";
+  case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+    return "Integrated GPU";
+  case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+    return "Virtual GPU";
+  case VK_PHYSICAL_DEVICE_TYPE_CPU:
+    return "CPU";
+  case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+  default:
+    return "Unknown";
+  }
+  
+}
+
+#define CHECK(Ret) \
+  if (Ret != VK_SUCCESS) \
+  {\
+    LogPrint(Log::Error, "CheckRet", "%s !!\n\tReturn Error: %s @line: %d @file: %s.\n", #Ret, VulkanError(Ret), __LINE__, __FILE__); \
+  }
 
 VkFormat ConvertPixelFormatToVulkanEnum(PixelFormat const& e) {
   switch (e) {
@@ -179,17 +276,25 @@ VkSampleCountFlagBits ConvertMultiSampleFlagToVulkanEnum(MultiSampleFlag const& 
   }
 }
 
+/*
+template <class TNgfxObj>
+class TDeviceChild : public TNgfxObj
+{
+public:
+};
+*/
+
 class VulkanCommandBuffer : public CommandBuffer
 {
 protected:
   class VulkanQueue* OwningRoot;
-private:
-  VkCommandBuffer Handle = VK_NULL_HANDLE;
 public:
+  VkCommandBuffer Handle = VK_NULL_HANDLE;
   void Commit(Fence * pFence) override;
-  struct RenderCommandEncoder * RenderCommandEncoder() override;
+  struct RenderCommandEncoder * RenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass) override;
   struct ComputeCommandEncoder * ComputeCommandEncoder() override;
   struct ParallelRenderCommandEncoder * ParallelCommandEncoder() override;
+  struct CopyCommandEncoder * CopyCommandEncoder() override;
   VulkanCommandBuffer(VulkanQueue* pQueue);
   ~VulkanCommandBuffer();
 };
@@ -200,9 +305,10 @@ class TCmdEncoder : public T
 public:
   using Super = TCmdEncoder<T>;
 
-  TCmdEncoder();
+  TCmdEncoder(VulkanCommandBuffer* pCmd);
   virtual ~TCmdEncoder();
 
+  void Barrier(Resource * pResource) override;
   void SetPipeline(Pipeline* pPipelineState) override;
   void SetPipelineLayout(PipelineLayout * pPipelineLayout) override;
   void SetBindingTable(BindingTable * pBindingTable) override;
@@ -211,11 +317,37 @@ public:
   VulkanCommandBuffer* OwningCommand = nullptr;
 };
 
+class VulkanCopyEncoder : public TCmdEncoder<CopyCommandEncoder>
+{
+public:
+  VulkanCopyEncoder(VulkanCommandBuffer * pCmd);
+  ~VulkanCopyEncoder();
+  void CopyTexture() override;
+  void CopyBuffer(uint64_t srcOffset, uint64_t dstOffset, uint64_t size, Buffer * srcBuffer, Buffer * dstBuffer) override;
+};
+
+class VulkanComputeEncoder : public TCmdEncoder<ComputeCommandEncoder>
+{
+public:
+  VulkanComputeEncoder(VulkanCommandBuffer* pCmd);
+  ~VulkanComputeEncoder();
+  void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
+};
+
 class VulkanRenderEncoder : public TCmdEncoder<RenderCommandEncoder>
 {
 public:
-  VulkanCommandBuffer* OwningCommand = nullptr;
+  VulkanRenderEncoder(VulkanCommandBuffer* pCmd);
+  ~VulkanRenderEncoder();
 
+  void SetScissorRect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+  void SetViewport(const Viewport * pViewport);
+  void SetIndexBuffer(Buffer * pIndexBuffer);
+  void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer);
+  void SetPrimitiveType(PrimitiveType primitive);
+  void DrawInstanced(const DrawInstancedDesc * drawParam);
+  void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam);
+  void Present(Drawable * pDrawable);
 };
 
 class VulkanQueue : public CommandQueue
@@ -225,9 +357,10 @@ public:
   ~VulkanQueue() override;
   struct CommandBuffer * CommandBuffer() override;
   VulkanDevice* OwningRoot;
-private:
+  bool IsSupport(CommandQueueType const&type) const;
   VkQueue Handle = VK_NULL_HANDLE;
-protected:
+  uint32_t FamilyId = 0;
+  uint32_t QueueId = 0;
 };
 
 class VulkanRenderPass : public RenderPass
@@ -279,7 +412,7 @@ public:
   VulkanDrawable();
   ~VulkanDrawable() override;
 
-  class Texture * Texture() override;
+  struct Texture * Texture() override;
 
   VkFramebuffer Handle = VK_NULL_HANDLE;
   class VulkanTextureView* DepthStencilView = nullptr;
@@ -287,23 +420,27 @@ public:
   std::vector<VulkanTextureView*> OtherAttachments;
 };
 
-void VulkanCommandBuffer::Commit(Fence * pFence)
+RenderCommandEncoder* VulkanCommandBuffer::RenderCommandEncoder(Drawable* pDrawable, RenderPass* pRenderPass)
 {
-}
-
-RenderCommandEncoder * VulkanCommandBuffer::RenderCommandEncoder()
-{
-  return nullptr;
+  return OwningRoot->IsSupport(CommandQueueType::Graphics)? 
+    new VulkanRenderEncoder(this) : nullptr;
 }
 
 ComputeCommandEncoder * VulkanCommandBuffer::ComputeCommandEncoder()
 {
-  return nullptr;
+  return OwningRoot->IsSupport(CommandQueueType::Compute) ?
+    new VulkanComputeEncoder(this) : nullptr;
 }
 
 ParallelRenderCommandEncoder * VulkanCommandBuffer::ParallelCommandEncoder()
 {
   return nullptr;
+}
+
+CopyCommandEncoder * VulkanCommandBuffer::CopyCommandEncoder()
+{
+  return OwningRoot->IsSupport(CommandQueueType::Copy) ?
+    new VulkanCopyEncoder(this) : nullptr;
 }
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanQueue* pQueue)
@@ -325,9 +462,11 @@ protected:
   VulkanDevice* OwningDevice;
 private:
   VkSampler Handle = VK_NULL_HANDLE;
+  VkSamplerCreateInfo Info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 public:
   VulkanSampler(VulkanDevice* pDevice, const SamplerDesc* pDesc);
   ~VulkanSampler();
+  Result GetDesc(SamplerDesc * desc) override;
 };
 
 template<class RHIObj>
@@ -408,15 +547,16 @@ public:
   using ResInfo = typename ResTrait<TRHIResObj>::CreateInfo;
   using Super = TResource<TRHIResObj>;
 
-  void * Map(uint64_t offset, uint64_t size) override;
-  void UnMap() override;
-
-  VulkanDevice* OwningDevice;
-
   TResource(VulkanDevice* Device) : OwningDevice(Device) {}
   virtual ~TResource();
 
+  void * Map(uint64_t offset, uint64_t size) override;
+  void UnMap() override;
+
   Result Create(ResInfo const& Info, StorageOption const& Option);
+  TObj GetHandle() const { return Handle; }
+
+  VulkanDevice* OwningDevice;
 
 protected:
   VkMappedMemoryRange MappedMemoryRange = {};
@@ -460,7 +600,7 @@ public:
 class VulkanShaderLayout : public ShaderLayout
 {
 public:
-  VulkanDevice* OwningDevice;
+  VulkanDevice* OwningDevice = nullptr;
   VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
   VkDescriptorSetLayoutCreateInfo Info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
 
@@ -523,12 +663,18 @@ public:
   VkDevice Handle = VK_NULL_HANDLE;
 
 private:
+
+  struct QueueInfo
+  {
+    uint32_t Flags = 0;
+    uint32_t Family = 0;
+    uint32_t Count = 0;
+  };
+
   VkPhysicalDevice Device = VK_NULL_HANDLE;
   VmaAllocator MemoryAllocator = nullptr;
-  std::vector<VkQueueFamilyProperties> QueueFamilyProps;
-  int32_t GraphicsQueueFamilyId = 0;
-  int32_t ComputeQueueFamilyId = 0;
-  int32_t TransferQueueFamilyId = 0;
+  std::vector<QueueInfo> QueueInfos;
+
 protected:
   VulkanFactory* OwningRoot;
   friend class VulkanFactory;
@@ -553,6 +699,11 @@ CommandBuffer * VulkanQueue::CommandBuffer()
 {
   
   return nullptr;
+}
+
+bool VulkanQueue::IsSupport(CommandQueueType const& type) const
+{
+  return false;
 }
 
 template<class TRHIResObj>
@@ -592,10 +743,10 @@ Result TResource<TRHIResObj>::Create(ResInfo const & _Info, StorageOption const 
     MemReq.usage = VMA_MEMORY_USAGE_CPU_ONLY;
     break;
   }
-  ResTrait<TRHIResObj>::vmaCreate(OwningDevice->MemoryAllocator,
+  CHECK(ResTrait<TRHIResObj>::vmaCreate(OwningDevice->MemoryAllocator,
     &Info, &MemReq,
     &Handle, &MappedMemoryRange,
-    VULKAN_ALLOCATOR);
+    VULKAN_ALLOCATOR));
   return Result::Ok;
 }
 
@@ -604,10 +755,24 @@ VulkanBuffer::VulkanBuffer(VulkanDevice * pDevice, const BufferDesc* pDesc)
 {
   Info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
   Info.size = pDesc->size;
-  Info.usage;
+  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::UnOrderedAccess)
+  {
+    Info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  }
+  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::VertexBuffer)
+  {
+    Info.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  }
+  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::ConstantBuffer)
+  {
+    Info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+  }
+  if ((uint32_t)pDesc->option & (uint32)StorageOption::Private)
+  {
+    Info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  }
   Info.flags = 0;
   Info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
   Super::Create(Info, pDesc->option);
 }
 
@@ -688,6 +853,7 @@ VulkanTexture::~VulkanTexture()
 class VulkanSwapChain : public SwapChain
 {
 public:
+  void InitWithRenderPass(RenderPass * pRenderPass) override;
   Result GetTexture(Texture ** ppTexture, uint32_t index) override;
   Drawable * CurrentDrawable() override;
   Drawable * NextDrawable() override;
@@ -708,23 +874,37 @@ namespace ngfx {
 class VulkanFactory : public Factory
 {
 public:
+  bool Debug = false;
+
   Result EnumDevice(uint32_t * count, Device ** ppDevice);
   Result CreateSwapchain(const SwapChainDesc * desc, CommandQueue * pCommandQueue, void * pWindow, SwapChain ** pSwapchain);
   Result CreateCompiler(ShaderLang shaderLang, Compiler ** compiler);
   
-  friend NGFX_API Result CreateFactory(Factory ** ppFactory)
+  friend NGFX_API Result CreateFactory(Factory ** ppFactory, bool debugEnabled)
   {
-    *ppFactory = new VulkanFactory;
+    *ppFactory = new VulkanFactory(debugEnabled);
     return Result::Ok;
   }
 
-  VulkanFactory()
+  VulkanFactory(bool debug) : Debug(debug)
   {
+    uint32_t layerCount = 0;
+    std::vector<VkLayerProperties> layers;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    layers.resize(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+
+    uint32_t layerExtPropCount = 0;
+    std::vector<VkExtensionProperties> extProps;
+    vkEnumerateInstanceExtensionProperties(nullptr, &layerExtPropCount, nullptr);
+    extProps.resize(layerExtPropCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &layerExtPropCount, extProps.data());
+
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "test";
     appInfo.pEngineName = "test";
-    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 1);
+    appInfo.apiVersion = VK_MAKE_VERSION(1, 0, 42);
     appInfo.engineVersion = 1;
     appInfo.applicationVersion = 0;
 
@@ -732,15 +912,16 @@ public:
     instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCreateInfo.pNext = NULL;
     instanceCreateInfo.pApplicationInfo = &appInfo;
-    std::vector<const char*> enabledExtensions = {
-      VK_KHR_SURFACE_EXTENSION_NAME,
-      VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-    };
-    instanceCreateInfo.enabledExtensionCount = enabledExtensions.size();
-    instanceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
-    instanceCreateInfo.enabledLayerCount = 0;
-    instanceCreateInfo.ppEnabledLayerNames = nullptr;
-    vkCreateInstance(&instanceCreateInfo, VULKAN_ALLOCATOR, &Handle);
+
+    if(Debug) // Debug extension ??
+    {
+      instanceCreateInfo.enabledLayerCount = 1;
+      instanceCreateInfo.ppEnabledLayerNames = RequiredLayers;
+    }
+    
+    instanceCreateInfo.enabledExtensionCount = RequiredInstanceExtensions.size();
+    instanceCreateInfo.ppEnabledExtensionNames = RequiredInstanceExtensions.data();
+    CHECK(vkCreateInstance(&instanceCreateInfo, VULKAN_ALLOCATOR, &Handle));
   }
   ~VulkanFactory() override
   {
@@ -761,67 +942,88 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   OwningRoot->AddInternalRef();
 
   uint32 queueCount = 0;
+  std::vector<VkQueueFamilyProperties> QueueFamilyProps;
   vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueCount, NULL);
   QueueFamilyProps.resize(queueCount);
   vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueCount, QueueFamilyProps.data());
+  QueueInfos.resize(queueCount);
+  VkPhysicalDeviceProperties Prop;
+  vkGetPhysicalDeviceProperties(Device, &Prop);
 
-  uint32 qId = 0;
-  for (qId = 0; qId < queueCount; qId++)
-  {
-    if (QueueFamilyProps[qId].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-    {
-      GraphicsQueueFamilyId = qId;
-      break;
-    }
-  }
-  for (qId = 0; qId < queueCount; qId++)
-  {
-    if (QueueFamilyProps[qId].queueFlags & VK_QUEUE_COMPUTE_BIT)
-    {
-      ComputeQueueFamilyId = qId;
-      break;
-    }
-  }
-  for (qId = 0; qId < queueCount; qId++)
-  {
-    if (QueueFamilyProps[qId].queueFlags & VK_QUEUE_TRANSFER_BIT)
-    {
-      TransferQueueFamilyId = qId;
-      break;
-    }
-  }
+  LogPrint(Log::Info, "Device", "Vendor: %s Type: %s API Version: %d.%d.%d\n",
+    Prop.deviceName,
+    DeviceType(Prop.deviceType),
+    VK_VERSION_MAJOR(Prop.apiVersion),
+    VK_VERSION_MINOR(Prop.apiVersion), 
+    VK_VERSION_PATCH(Prop.apiVersion));
 
+
+  // Create Command Queue
   float QueuePriority = 0.0f;
-  VkDeviceQueueCreateInfo QueueInfos[2];
-  QueueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  QueueInfos[0].queueFamilyIndex = GraphicsQueueFamilyId;
-  QueueInfos[0].queueCount = 1;
-  QueueInfos[0].pQueuePriorities = &QueuePriority;
-  QueueInfos[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  QueueInfos[1].queueFamilyIndex = ComputeQueueFamilyId;
-  QueueInfos[1].queueCount = 1;
-  QueueInfos[1].pQueuePriorities = &QueuePriority;
+  std::vector<VkDeviceQueueCreateInfo> DeviceQueueInfo;
+  DeviceQueueInfo.resize(queueCount);
+  std::vector<float*> QueuePriorities;
+  // Async Compute & Transfer
+  for (uint32 Id = 0; Id < queueCount; Id++)
+  {
+    QueueInfos[Id].Family = Id;
+    QueueInfos[Id].Flags = QueueFamilyProps[Id].queueFlags;
+    QueueInfos[Id].Count = QueueFamilyProps[Id].queueCount;
+    DeviceQueueInfo[Id].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    DeviceQueueInfo[Id].pNext = nullptr;
+    DeviceQueueInfo[Id].flags = 0;
+    DeviceQueueInfo[Id].queueFamilyIndex = Id;
+    DeviceQueueInfo[Id].queueCount = QueueFamilyProps[Id].queueCount;
+    float * Priorities = new float[QueueFamilyProps[Id].queueCount]{ 0 };
+    DeviceQueueInfo[Id].pQueuePriorities = Priorities;
+    QueuePriorities.push_back(Priorities);
+  }
 
-  std::vector<const char*> enabledExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+  uint32_t extCount = 0;
+  std::vector<VkExtensionProperties> exts;
+  vkEnumerateDeviceExtensionProperties(Device, nullptr, &extCount, nullptr);
+  exts.resize(extCount);
+  vkEnumerateDeviceExtensionProperties(Device, nullptr, &extCount, exts.data());
+  std::set<std::string> deviceExtensions;
+  for (auto ext : exts)
+  {
+    deviceExtensions.insert(ext.extensionName);
+  }
+
+  uint32_t layerCount = 0;
+  std::vector<VkLayerProperties> layers;
+  vkEnumerateDeviceLayerProperties(Device, &layerCount, nullptr);
+  layers.resize(layerCount);
+  vkEnumerateDeviceLayerProperties(Device, &layerCount, layers.data());
+
+  // KHX ?
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   deviceCreateInfo.pNext = NULL;
-  deviceCreateInfo.queueCreateInfoCount = 2;
-  deviceCreateInfo.pQueueCreateInfos = QueueInfos;
+  deviceCreateInfo.queueCreateInfoCount = DeviceQueueInfo.size();
+  deviceCreateInfo.pQueueCreateInfos = DeviceQueueInfo.data();
   //deviceCreateInfo.pEnabledFeatures = &m_Features;
-
-  //if (enableValidation)
+  if (OwningRoot->Debug)
   {
-  //  deviceCreateInfo.enabledLayerCount = 1;
-  //  deviceCreateInfo.ppEnabledLayerNames = g_ValidationLayerNames;
+    if (deviceExtensions.find(VK_EXT_DEBUG_MARKER_EXTENSION_NAME) != deviceExtensions.end())
+    {
+      RequiredDeviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+    }
+    deviceCreateInfo.enabledLayerCount = 1;
+    deviceCreateInfo.ppEnabledLayerNames = RequiredLayers;
   }
-
-  if (enabledExtensions.size() > 0)
+  
+  if (RequiredDeviceExtensions.size() > 0)
   {
-    deviceCreateInfo.enabledExtensionCount = (uint32_t)enabledExtensions.size();
-    deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
+    deviceCreateInfo.enabledExtensionCount = (uint32_t)RequiredDeviceExtensions.size();
+    deviceCreateInfo.ppEnabledExtensionNames = RequiredDeviceExtensions.data();
   }
-  vkCreateDevice(Device, &deviceCreateInfo, VULKAN_ALLOCATOR, &Handle);
+  CHECK(vkCreateDevice(Device, &deviceCreateInfo, VULKAN_ALLOCATOR, &Handle));
+
+  for(auto ptr : QueuePriorities)
+  {
+    delete[]ptr;
+  }
 
   VmaAllocatorCreateInfo AllocCreateInfo = {
     Device, Handle, 0, 0,
@@ -839,12 +1041,61 @@ VulkanDevice::~VulkanDevice()
 
 void VulkanDevice::GetDesc(DeviceDesc * pDesc)
 {
+  VkDebugMarkerObjectNameInfoEXT ext;
+  //vkDebugMarkerSetObjectNameEXT(Handle, &ext);
 }
 
 Result VulkanDevice::CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue)
 {
-  
-  return Result();
+  VulkanQueue* pVkQueue = new VulkanQueue(this);
+  switch (queueType)
+  {
+  case CommandQueueType::Graphics:
+  {
+    for(auto Info : QueueInfos)
+    {
+      if(Info.Flags & VK_QUEUE_GRAPHICS_BIT)
+      {
+        uint32_t qId = 0;
+        vkGetDeviceQueue(Handle, Info.Family, qId, &pVkQueue->Handle);
+        pVkQueue->FamilyId = Info.Family;
+        pVkQueue->QueueId = qId;
+        break;
+      }
+    }
+    break;
+  }
+  case CommandQueueType::Compute:
+  {
+    for (auto Info : QueueInfos)
+    {
+      if (Info.Flags & VK_QUEUE_COMPUTE_BIT)
+      {
+        uint32_t qId = 0;
+        vkGetDeviceQueue(Handle, Info.Family, 0, &pVkQueue->Handle);
+        pVkQueue->FamilyId = Info.Family;
+        pVkQueue->QueueId = 0;
+      }
+    }
+    break;
+  }
+  case CommandQueueType::Copy:
+  {
+    for (auto Info : QueueInfos)
+    {
+      if (Info.Flags & VK_QUEUE_TRANSFER_BIT)
+      {
+        uint32_t qId = 0;
+        vkGetDeviceQueue(Handle, Info.Family, 0, &pVkQueue->Handle);
+        pVkQueue->FamilyId = Info.Family;
+        pVkQueue->QueueId = 0;
+      }
+    }
+    break;
+  }
+  }
+  *pQueue = pVkQueue;
+  return Result::Ok;
 }
 
 Result VulkanDevice::CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout)
@@ -857,6 +1108,10 @@ Result VulkanDevice::CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLa
 {
   *ppPipelineLayout = new VulkanPipelineLayout(this, pPipelineLayoutDesc);
   return Result();
+}
+
+void VulkanSwapChain::InitWithRenderPass(RenderPass * pRenderPass)
+{
 }
 
 Result VulkanSwapChain::GetTexture(Texture ** ppTexture, uint32_t index)
@@ -991,6 +1246,7 @@ Result VulkanDevice::CreateRenderTarget(const RenderTargetDesc * desc, RenderTar
 
 Result VulkanDevice::CreateSampler(const SamplerDesc * desc, Sampler ** pSampler)
 {
+  *pSampler = new VulkanSampler(this, desc);
   return Result::Ok;
 }
 
@@ -1021,17 +1277,46 @@ VulkanSampler::VulkanSampler(VulkanDevice* pDevice, const SamplerDesc* pDesc)
   : OwningDevice(pDevice)
 {
   OwningDevice->AddInternalRef();
+  Info.magFilter = ConvertFilterModeToVulkanEnum(pDesc->filter.magFilter);
+  Info.minFilter = ConvertFilterModeToVulkanEnum(pDesc->filter.minFilter);
+  Info.mipmapMode = pDesc->filter.mipMapFilter == FilterMode::Linear?
+    VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  Info.addressModeU = ConvertAddressModeToVulkanEnum(pDesc->U);
+  Info.addressModeV = ConvertAddressModeToVulkanEnum(pDesc->V);
+  Info.addressModeW = ConvertAddressModeToVulkanEnum(pDesc->W);
+  Info.mipLodBias = pDesc->mipLodBias;
+  Info.anisotropyEnable;
+  Info.maxAnisotropy = pDesc->maxAnistropy;
+  Info.compareEnable;
+  Info.compareOp = ConvertComparisonFunctionToVulkanEnum(pDesc->comparisonFunc);
+  Info.minLod = pDesc->minLod;
+  Info.maxLod = pDesc->maxLod;
+  Info.borderColor;
+  Info.unnormalizedCoordinates;
+  vkCreateSampler(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
 }
 
 VulkanSampler::~VulkanSampler()
 {
-  vkDestroySampler(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  if(Handle)
+  {
+    vkDestroySampler(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
+}
+
+Result VulkanSampler::GetDesc(SamplerDesc * desc)
+{
+  return Result::Ok;
 }
 
 VulkanComputePipeline::VulkanComputePipeline(VulkanDevice * pDevice, Function * pComputeFunc, PipelineLayout * pLayout)
   : Super(pDevice)
 {
+  VkComputePipelineCreateInfo Info = 
+  {
+    VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, nullptr, 0
+  };
 }
 
 VulkanComputePipeline::~VulkanComputePipeline()
@@ -1041,6 +1326,26 @@ VulkanComputePipeline::~VulkanComputePipeline()
 VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderPipelineDesc * pDesc, RenderPass * pRenderPass, PipelineLayout * pLayout)
   : Super(pDevice)
 {
+  VkGraphicsPipelineCreateInfo Info =
+  {
+    VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, nullptr, 0
+  };
+  uint32_t stageCount = 0;
+  if (pDesc->vertexFunction)
+  {
+    auto vertShader = static_cast<VulkanFunction*>(pDesc->vertexFunction);
+    vkCreateShaderModule(OwningDevice->Handle, &vertShader->ShaderModuleInfo, VULKAN_ALLOCATOR, &vertShader->ShaderModule);
+    stageCount++;
+  }
+  if (pDesc->pixelFunction)
+  {
+    stageCount++;
+  }
+  Info.stageCount = stageCount;
+  VkPipelineShaderStageCreateInfo* pStageInfos = 
+    (VkPipelineShaderStageCreateInfo*)calloc(stageCount, sizeof(VkPipelineShaderStageCreateInfo));
+  //pStageInfos[0] = vertShader->GetPipelineStageInfo();
+  Info.pStages = pStageInfos;
 }
 
 VulkanRenderPipeline::~VulkanRenderPipeline()
@@ -1063,7 +1368,10 @@ TPipeline<T>::TPipeline(VulkanDevice * pDevice)
 template<class T>
 TPipeline<T>::~TPipeline()
 {
-  vkDestroyPipeline(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  if(Handle)
+  {
+    vkDestroyPipeline(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
 }
 
@@ -1085,7 +1393,10 @@ VulkanShaderLayout::VulkanShaderLayout(VulkanDevice * pDevice, const ShaderLayou
 
 VulkanShaderLayout::~VulkanShaderLayout()
 {
-  vkDestroyDescriptorSetLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  if(Handle)
+  {
+    vkDestroyDescriptorSetLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
 }
 
@@ -1108,7 +1419,10 @@ VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const Pipelin
 
 VulkanPipelineLayout::~VulkanPipelineLayout()
 {
-  vkDestroyPipelineLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  if(Handle)
+  {
+    vkDestroyPipelineLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
 }
 
@@ -1150,7 +1464,10 @@ VulkanFence::VulkanFence(VulkanDevice * pDevice)
 
 VulkanFence::~VulkanFence()
 {
-  vkDestroyFence(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  if(Handle)
+  {
+    vkDestroyFence(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
 }
 
@@ -1175,13 +1492,24 @@ Texture * VulkanDrawable::Texture()
   return nullptr;
 }
 
+void VulkanCommandBuffer::Commit(Fence * pFence)
+{
+  vkQueueSubmit(OwningRoot->Handle, 0, nullptr, static_cast<VulkanFence*>(pFence)->Handle);
+}
+
 template<class T>
-TCmdEncoder<T>::TCmdEncoder()
+TCmdEncoder<T>::TCmdEncoder(VulkanCommandBuffer* pCmd)
+  : OwningCommand(pCmd)
 {
 }
 
 template<class T>
 TCmdEncoder<T>::~TCmdEncoder()
+{
+}
+
+template<class T>
+void TCmdEncoder<T>::Barrier(Resource * pResource)
 {
 }
 
@@ -1203,4 +1531,85 @@ void TCmdEncoder<T>::SetBindingTable(BindingTable * pBindingTable)
 template<class T>
 void TCmdEncoder<T>::EndEncode()
 {
+}
+
+VulkanRenderEncoder::VulkanRenderEncoder(VulkanCommandBuffer * pCmd)
+  : Super(pCmd)
+{
+}
+
+VulkanRenderEncoder::~VulkanRenderEncoder()
+{
+}
+
+void VulkanRenderEncoder::SetScissorRect(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+  VkRect2D Rect2D = { {x, y}, {w, h} };
+  vkCmdSetScissor(OwningCommand->Handle, 0, 1, &Rect2D);
+}
+
+void VulkanRenderEncoder::SetViewport(const Viewport * pViewport)
+{
+  VkViewport viewPort = { pViewport->left, pViewport->top, pViewport->width, pViewport->height, pViewport->minDepth, pViewport->maxDepth };
+  vkCmdSetViewport(OwningCommand->Handle, 0, 1, &viewPort);
+}
+
+void VulkanRenderEncoder::SetIndexBuffer(Buffer * pIndexBuffer)
+{
+}
+
+void VulkanRenderEncoder::SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer)
+{
+}
+
+void VulkanRenderEncoder::SetPrimitiveType(PrimitiveType primitive)
+{
+}
+
+void VulkanRenderEncoder::DrawInstanced(const DrawInstancedDesc * drawParam)
+{
+}
+
+void VulkanRenderEncoder::DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam)
+{
+}
+
+void VulkanRenderEncoder::Present(Drawable * pDrawable)
+{
+}
+
+VulkanCopyEncoder::VulkanCopyEncoder(VulkanCommandBuffer * pCmd)
+  : Super(pCmd)
+{
+}
+
+VulkanCopyEncoder::~VulkanCopyEncoder()
+{
+}
+
+void VulkanCopyEncoder::CopyTexture()
+{
+}
+
+void VulkanCopyEncoder::CopyBuffer(uint64_t srcOffset, uint64_t dstOffset, uint64_t size, Buffer * srcBuffer, Buffer * dstBuffer)
+{
+  VkBufferCopy copy = { srcOffset, dstOffset, size };
+  vkCmdCopyBuffer(OwningCommand->Handle, 
+    static_cast<VulkanBuffer*>(srcBuffer)->GetHandle(), 
+    static_cast<VulkanBuffer*>(dstBuffer)->GetHandle(), 
+    1, &copy);
+}
+
+VulkanComputeEncoder::VulkanComputeEncoder(VulkanCommandBuffer * pCmd)
+  : Super(pCmd)
+{
+}
+
+VulkanComputeEncoder::~VulkanComputeEncoder()
+{
+}
+
+void VulkanComputeEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
+{
+  vkCmdDispatch(OwningCommand->Handle, x, y, z);
 }

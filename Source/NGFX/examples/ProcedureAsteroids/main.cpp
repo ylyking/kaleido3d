@@ -14,7 +14,8 @@ using namespace ngfx;
 int main()
 {
   Ptr<Factory> factory;
-  CreateFactory(factory.GetAddressOf());
+  CreateFactory(factory.GetAddressOf(), true);
+  factory->SetName("VulkanFactory");
 
   Ptr<Device> device;
   uint32_t Count = 0;
@@ -23,41 +24,59 @@ int main()
 
   Ptr<CommandQueue> queue;
   device->CreateCommandQueue(CommandQueueType::Graphics, queue.GetAddressOf());
+  queue->SetName("GraphicsQueue");
 
   Ptr<SwapChain> swapChain;
-  factory->CreateSwapchain(nullptr, queue.Get(), nullptr, swapChain.GetAddressOf());
+  SwapChainDesc swapChainDesc = { PixelFormat::RGBA8UNorm, 800, 600, 2, true, PixelFormat::D32Float };
+  factory->CreateSwapchain(&swapChainDesc, queue.Get(), nullptr, swapChain.GetAddressOf());
+  swapChain->SetName("DefaultSwapchain");
 
   Ptr<Buffer> buffer;
   BufferDesc bufferDesc{ BufferViewBit::VertexBuffer, StorageOption::Managed, 10 };
   device->CreateBuffer(&bufferDesc, buffer.GetAddressOf());
+  buffer->SetName("Buffer0");
 
   Ptr<Texture> texture;
-  device->CreateTexture(nullptr, texture.GetAddressOf());
+  TextureDesc texDesc = { TextureViewBit::RenderTarget, StorageOption::Managed, 
+    MultiSampleFlag::MS1x, PixelFormat::RGBA8UNorm,
+    1024, 1024, 1, 0, 0 };
+  device->CreateTexture(&texDesc, texture.GetAddressOf());
+  texture->SetName("Texture0");
 
   Ptr<Fence> fence;
   device->CreateFence(fence.GetAddressOf());
+  fence->SetName("DefaultFence");
 
   Ptr<Compiler> compiler;
   factory->CreateCompiler(ngfx::ShaderLang::HLSL, compiler.GetAddressOf());
 
   Ptr<Function> function;
-  compiler->Compile(nullptr, nullptr, 0, function.GetAddressOf());
+  ShaderOption shaderOpt = { ShaderType::Vertex, ShaderLang::HLSL, "main", ShaderProfile::SM5, ShaderFormat::Text };
+  compiler->Compile(&shaderOpt, nullptr, 0, function.GetAddressOf());
+
+  Ptr<PipelineLayout> pipelineLayout;
+  PipelineLayoutDesc pipelineLayoutDesc = {};
+  device->CreatePipelineLayout(&pipelineLayoutDesc, pipelineLayout.GetAddressOf());
 
   Ptr<Pipeline> computePipeline;
-  device->CreateComputePipeline(nullptr, nullptr, computePipeline.GetAddressOf());
+  device->CreateComputePipeline(nullptr, pipelineLayout.Get(), computePipeline.GetAddressOf());
 
   Ptr<RenderPass> renderPass;
-  device->CreateRenderPass(nullptr, renderPass.GetAddressOf());
+  RenderPassDesc renderPassDesc = { nullptr, 0, nullptr };
+  device->CreateRenderPass(&renderPassDesc, renderPass.GetAddressOf());
+  swapChain->InitWithRenderPass(renderPass.Get());
 
   Ptr<Pipeline> renderPipeline;
-  device->CreateRenderPipeline(nullptr, nullptr, nullptr, renderPipeline.GetAddressOf());
+  device->CreateRenderPipeline(nullptr, pipelineLayout.Get(), renderPass.Get(), renderPipeline.GetAddressOf());
 
   Ptr<CommandBuffer> commandBuffer = Ptr<CommandBuffer>(queue->CommandBuffer());
   
-  Ptr<RenderCommandEncoder> renderCommand = Ptr<RenderCommandEncoder>(commandBuffer->RenderCommandEncoder());
+  Ptr<Drawable> drawable = Ptr<Drawable>(swapChain->NextDrawable());
+
+  Ptr<RenderCommandEncoder> renderCommand = Ptr<RenderCommandEncoder>(commandBuffer->RenderCommandEncoder(drawable.Get(), renderPass.Get()));
   //renderCommand->SetViewport();
   renderCommand->EndEncode();
-
+  //commandBuffer->Present();
   commandBuffer->Commit(fence.Get());
 
 

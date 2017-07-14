@@ -262,6 +262,7 @@ macro(add_unittest EXAMPLE_NAME)
     elseif(WIN32)
         add_executable(${EXAMPLE_NAME} ${ARGN} ${Kaleido3D_SOURCE_DIR}/Source/Platform/Windows/win32icon.rc)
         target_link_libraries(${EXAMPLE_NAME} ${UT_LINK_LIBS})
+        set_target_properties(${EXAMPLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
     elseif(MACOS)
         add_mac_app(${EXAMPLE_NAME} 
             SRCS ${ARGN} 

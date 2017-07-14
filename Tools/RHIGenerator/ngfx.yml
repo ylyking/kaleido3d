@@ -698,6 +698,7 @@ protype:
         enums:
             - Graphics
             - Compute
+            - Copy
 
     - shader type:
         type: enum
@@ -763,6 +764,10 @@ protype:
                 return: result
             - buffer count:
                 return: uint32_t
+            - init with render pass:
+                params:
+                    - name: pRenderPass
+                      type: render pass *
 
     - function:
         type: interface
@@ -1117,9 +1122,16 @@ protype:
                   - type: fence *
                     name: pFence
             - render command encoder:
+                params:
+                  - name: pDrawable
+                    type: drawable *
+                  - name: pRenderPass
+                    type: render pass *                    
                 return: render command encoder *
             - compute command encoder:
                 return: compute command encoder *
+            - copy command encoder:
+                return: copy command encoder *
             - parallel command encoder:
                 return: parallel render command encoder *
 
@@ -1127,12 +1139,10 @@ protype:
         type: interface
         inherit: named object<true>
         functions:
-            - copy texture:
+            - barrier:
                 params:
-                  -
-            - copy buffer:
-                params:
-                  -
+                    - name: pResource
+                      type: resource *
             - set pipeline:
                 params:
                   - name: pPipelineState
@@ -1147,6 +1157,26 @@ protype:
                     type: binding table *
             - end encode
 
+    - copy command encoder:
+        type: interface
+        inherit: command encoder
+        comment: Command Encoder used for Copy and Blit
+        functions:
+            - copy texture:
+                params:
+                  -
+            - copy buffer:
+                params:
+                  - name: srcOffset
+                    type: uint64_t
+                  - name: dstOffset
+                    type: uint64_t
+                  - name: size
+                    type: uint64_t
+                  - name: srcBuffer
+                    type: buffer *
+                  - name: dstBuffer
+                    type: buffer *
 
     - render command encoder:
         type: interface
@@ -1223,4 +1253,6 @@ protype:
         params:
             - name: ppFactory
               type: factory **
+            - name: debugEnabled
+              type: bool
         return: result
