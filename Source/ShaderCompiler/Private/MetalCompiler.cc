@@ -132,9 +132,8 @@ namespace k3d
             }
           }
           auto metalc = make_unique<spirv_cross::CompilerMSL>(spirv);
-          spirv_cross::MSLConfiguration config;
+          spirv_cross::CompilerMSL::Options config;
           config.flip_vert_y = false;
-          config.flip_frag_y = false;
           config.entry_point_name = inOp.EntryFunction.CStr();
           auto result = metalc->compile(config, &vertAttrs, &resBindings);
           if (m_IsMac)

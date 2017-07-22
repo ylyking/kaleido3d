@@ -17,7 +17,7 @@ using namespace ngfx;
 
 #define VULKAN_ALLOCATOR nullptr
 
-static const char* RequiredLayers[] = 
+static std::vector<const char*> RequiredLayers =
 { 
   "VK_LAYER_LUNARG_standard_validation" 
 };
@@ -783,12 +783,12 @@ VulkanBuffer::~VulkanBuffer()
 
 Result VulkanBuffer::GetDesc(BufferDesc * pDesc)
 {
-  return Result();
+  return Result::Ok;
 }
 
 Result VulkanBuffer::CreateView(const BufferViewDesc * pDesc, BufferView ** ppView)
 {
-  return Result();
+  return Result::Ok;
 }
 
 VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
@@ -915,8 +915,8 @@ public:
 
     if(Debug) // Debug extension ??
     {
-      instanceCreateInfo.enabledLayerCount = 1;
-      instanceCreateInfo.ppEnabledLayerNames = RequiredLayers;
+      instanceCreateInfo.enabledLayerCount = RequiredLayers.size();
+      instanceCreateInfo.ppEnabledLayerNames = RequiredLayers.data();
     }
     
     instanceCreateInfo.enabledExtensionCount = RequiredInstanceExtensions.size();
@@ -1009,8 +1009,8 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
     {
       RequiredDeviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
     }
-    deviceCreateInfo.enabledLayerCount = 1;
-    deviceCreateInfo.ppEnabledLayerNames = RequiredLayers;
+    deviceCreateInfo.enabledLayerCount = RequiredLayers.size();
+    deviceCreateInfo.ppEnabledLayerNames = RequiredLayers.data();
   }
   
   if (RequiredDeviceExtensions.size() > 0)
@@ -1107,7 +1107,7 @@ Result VulkanDevice::CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDe
 Result VulkanDevice::CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout)
 {
   *ppPipelineLayout = new VulkanPipelineLayout(this, pPipelineLayoutDesc);
-  return Result();
+  return Result::Ok;
 }
 
 void VulkanSwapChain::InitWithRenderPass(RenderPass * pRenderPass)
@@ -1116,7 +1116,7 @@ void VulkanSwapChain::InitWithRenderPass(RenderPass * pRenderPass)
 
 Result VulkanSwapChain::GetTexture(Texture ** ppTexture, uint32_t index)
 {
-  return Result();
+  return Result::Ok;
 }
 
 Drawable * VulkanSwapChain::CurrentDrawable()
@@ -1131,7 +1131,7 @@ Drawable * VulkanSwapChain::NextDrawable()
 
 uint32_t VulkanSwapChain::BufferCount()
 {
-  return uint32_t();
+  return 0U;
 }
 
 VulkanSwapChain::VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const SwapChainDesc* pDesc, VulkanQueue* pQueue)
@@ -1210,12 +1210,12 @@ Result VulkanFactory::EnumDevice(uint32_t * count, Device ** ppDevice)
 
 Result VulkanTexture::GetDesc(TextureDesc * pDesc)
 {
-  return Result();
+  return Result::Ok;
 }
 
 Result VulkanTexture::CreateView(const TextureViewDesc * pDesc, TextureView ** ppView)
 {
-  return Result();
+  return Result::Ok;
 }
 
 Result VulkanDevice::CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable)
@@ -1259,7 +1259,7 @@ Result VulkanDevice::CreateBuffer(const BufferDesc * desc, Buffer ** pBuffer)
 Result VulkanDevice::CreateTexture(const TextureDesc * desc, Texture ** pTexture)
 {
   *pTexture = new VulkanTexture(this, desc);
-  return Result();
+  return Result::Ok;
 }
 
 Result VulkanDevice::CreateFence(Fence ** ppFence)
@@ -1354,7 +1354,7 @@ VulkanRenderPipeline::~VulkanRenderPipeline()
 
 Result VulkanRenderPipeline::GetDesc(RenderPipelineDesc * pDesc)
 {
-  return Result();
+  return Result::Ok;
 }
 
 

@@ -39,6 +39,14 @@ SOFTWARE.
   #define NGFX_API __attribute__((visibility("default"))) 
 #endif
 
+#if _MSC_VER
+#define Nullable _In_opt_
+#define NotNull _In_
+#else
+#define Nullable  
+#define NotNull  
+#endif
+
 typedef float    Float32;
 typedef uint32_t Bool32;
 typedef struct   Float32x4 { Float32 x,y,z,w;
@@ -344,9 +352,56 @@ typedef enum ngfxShaderType
   NGFX_SHADER_TYPE_TESSAILATIONCONTROL,
 } ngfxShaderType;
 
+// For shader reflection
+typedef enum ngfxDataType
+{
+  NGFX_DATA_TYPE_NONE,
+  NGFX_DATA_TYPE_STRUCT,
+  NGFX_DATA_TYPE_ARRAY,
+  NGFX_DATA_TYPE_POINTER,
+  NGFX_DATA_TYPE_TEXTURE,
+  NGFX_DATA_TYPE_BOOL,
+  NGFX_DATA_TYPE_BOOL2,
+  NGFX_DATA_TYPE_BOOL3,
+  NGFX_DATA_TYPE_BOOL4,
+  NGFX_DATA_TYPE_INT,
+  NGFX_DATA_TYPE_INT2,
+  NGFX_DATA_TYPE_INT3,
+  NGFX_DATA_TYPE_INT4,
+  NGFX_DATA_TYPE_UINT,
+  NGFX_DATA_TYPE_UINT2,
+  NGFX_DATA_TYPE_UINT3,
+  NGFX_DATA_TYPE_UINT4,
+  NGFX_DATA_TYPE_FLOAT,
+  NGFX_DATA_TYPE_FLOAT2,
+  NGFX_DATA_TYPE_FLOAT3,
+  NGFX_DATA_TYPE_FLOAT4,
+  NGFX_DATA_TYPE_MAT2,
+  NGFX_DATA_TYPE_MAT2X3,
+  NGFX_DATA_TYPE_MAT2X4,
+  NGFX_DATA_TYPE_MAT3X2,
+  NGFX_DATA_TYPE_MAT3,
+  NGFX_DATA_TYPE_MAT3X4,
+  NGFX_DATA_TYPE_MAT4X2,
+  NGFX_DATA_TYPE_MAT4,
+} ngfxDataType;
+
+typedef enum ngfxArgumentAccess
+{
+  NGFX_ARGUMENT_ACCESS_READ_ONLY = 1,
+  NGFX_ARGUMENT_ACCESS_WRITE_ONLY = 2,
+} ngfxArgumentAccess;
+
 typedef struct _ngfxShaderLayout* ngfxShaderLayout;
 typedef struct _ngfxSwapChain* ngfxSwapChain;
 typedef struct _ngfxFunction* ngfxFunction;
+typedef struct _ngfxVariableType* ngfxVariableType;
+typedef struct _ngfxVariable* ngfxVariable;
+typedef struct _ngfxStructType* ngfxStructType;
+typedef struct _ngfxArrayType* ngfxArrayType;
+typedef struct _ngfxPointerType* ngfxPointerType;
+typedef struct _ngfxTextureReferType* ngfxTextureReferType;
+typedef struct _ngfxReflection* ngfxReflection;
 typedef struct _ngfxCompiler* ngfxCompiler;
 typedef struct _ngfxFactory* ngfxFactory;
 typedef struct _ngfxRenderTarget* ngfxRenderTarget;
@@ -1060,9 +1115,56 @@ enum class ShaderType : uint32_t
   TessailationControl,
 };// Enum ShaderType
 
+// For shader reflection
+enum class DataType : uint32_t
+{
+  None,
+  Struct,
+  Array,
+  Pointer,
+  Texture,
+  Bool,
+  Bool2,
+  Bool3,
+  Bool4,
+  Int,
+  Int2,
+  Int3,
+  Int4,
+  Uint,
+  Uint2,
+  Uint3,
+  Uint4,
+  Float,
+  Float2,
+  Float3,
+  Float4,
+  Mat2,
+  Mat2x3,
+  Mat2x4,
+  Mat3x2,
+  Mat3,
+  Mat3x4,
+  Mat4x2,
+  Mat4,
+};// Enum DataType
+
+enum class ArgumentAccess : uint32_t
+{
+  ReadOnly = 1,
+  WriteOnly = 2,
+};// Enum ArgumentAccess
+
 struct ShaderLayout;
 struct SwapChain;
 struct Function;
+struct VariableType;
+struct Variable;
+struct StructType;
+struct ArrayType;
+struct PointerType;
+struct TextureReferType;
+struct Reflection;
 struct Compiler;
 struct Factory;
 struct RenderTarget;
@@ -2302,17 +2404,70 @@ struct Function : public RefCounted<false>
   virtual const char * Name() = 0;
 };
 
+// For shader reflection
+struct VariableType : public RefCounted<false>
+{
+  virtual DataType GetType() = 0;
+};
+
+// For shader reflection
+struct Variable : public RefCounted<false>
+{
+  virtual const char * Name() = 0;
+  virtual ArgumentAccess Access() = 0;
+  virtual VariableType * Type() = 0;
+  virtual uint32_t Index() = 0;
+  virtual bool Active() = 0;
+};
+
+// Not ready yet
+struct StructType : public VariableType
+{
+};
+
+// uniform buffer
+struct ArrayType : public VariableType
+{
+  virtual uint32_t Length() = 0;
+  virtual DataType ElementType() = 0;
+  virtual uint32_t Stride() = 0;
+  virtual VariableType * Elements() = 0;
+};
+
+// storage class buffer
+struct PointerType : public VariableType
+{
+  virtual ArgumentAccess Access() = 0;
+  virtual uint32_t Alignment() = 0;
+  virtual uint32_t DataSize() = 0;
+  virtual DataType ElementType() = 0;
+};
+
+struct TextureReferType : public VariableType
+{
+  virtual ArgumentAccess Access() = 0;
+  virtual DataType TextureDataType() = 0;
+  virtual TextureDimension TextureDim() = 0;
+};
+
+struct Reflection : public RefCounted<false>
+{
+  virtual uint32_t VariableCount() = 0;
+  virtual Variable ** Variables() = 0;
+  virtual ShaderType GetStage() = 0;
+};
+
 struct Compiler : public RefCounted<false>
 {
   virtual Result Compile(const ShaderOption * option, void * pData, uint32_t size, Function ** output) = 0;
-  virtual Result Reflect(void * pData, uint32_t size) = 0;
+  virtual Result Reflect(void * pData, uint32_t size, Reflection ** ppResult) = 0;
 };
 
 // Create devices and swapchains
 struct Factory : public NamedObject<false>
 {
   virtual Result EnumDevice(uint32_t * count, Device ** ppDevice) = 0;
-  virtual Result CreateSwapchain(const SwapChainDesc * desc, CommandQueue * pCommandQueue, void * pWindow, SwapChain ** pSwapchain) = 0;
+  virtual Result CreateSwapchain(NotNull const SwapChainDesc * desc, NotNull CommandQueue * pCommandQueue, void * pWindow, NotNull SwapChain ** pSwapchain) = 0;
   virtual Result CreateCompiler(ShaderLang shaderLang, Compiler ** compiler) = 0;
 };
 
@@ -2390,18 +2545,18 @@ struct Drawable : public RefCounted<true>
 // Gpu device
 struct Device : public NamedObject<true>
 {
-  virtual void GetDesc(DeviceDesc * pDesc) = 0;
+  virtual void GetDesc(NotNull DeviceDesc * pDesc) = 0;
   virtual Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) = 0;
-  virtual Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) = 0;
-  virtual Result CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) = 0;
-  virtual Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) = 0;
-  virtual Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
-  virtual Result CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) = 0;
-  virtual Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;
-  virtual Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) = 0;
-  virtual Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) = 0;
-  virtual Result CreateBuffer(const BufferDesc* desc, Buffer ** pBuffer) = 0;
-  virtual Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) = 0;
+  virtual Result CreateShaderLayout(NotNull const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) = 0;
+  virtual Result CreatePipelineLayout(NotNull const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) = 0;
+  virtual Result CreateBindingTable(NotNull PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) = 0;
+  virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable PipelineLayout * pPipelineLayout, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
+  virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Nullable PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) = 0;
+  virtual Result CreateRenderPass(NotNull const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;
+  virtual Result CreateRenderTarget(NotNull const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) = 0;
+  virtual Result CreateSampler(NotNull const SamplerDesc* desc, Sampler ** pSampler) = 0;
+  virtual Result CreateBuffer(NotNull const BufferDesc* desc, Buffer ** pBuffer) = 0;
+  virtual Result CreateTexture(NotNull const TextureDesc * desc, Texture ** pTexture) = 0;
   virtual Result CreateFence(Fence ** ppFence) = 0;
   virtual void WaitIdle() = 0;
 };

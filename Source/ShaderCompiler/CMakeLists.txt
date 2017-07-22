@@ -7,7 +7,7 @@ set(COMPILER_SRCS
     Private/GLSLangUtils.h Private/GLSLangUtils.cc
     Private/SPIRVCrossUtils.h Private/SPIRVCrossUtils.cc
     Private/MetalCompiler.cc Private/MetalCompiler.h
-	../../../Include/Interface/ShaderCommon.h
+	../../Include/Interface/ShaderCommon.h
 )
 
 source_group("Compiler\\Private" FILES ${COMPILER_SRCS})
@@ -15,7 +15,7 @@ set(PUB_SRCS Public/ShaderCompiler.h)
 source_group("Compiler\\Public" FILES ${PUB_SRCS})
 
 add_plugin(ShaderCompiler 
-	FOLDER "Tools"
+	FOLDER "Runtime/Tools"
 	SRCS ${COMPILER_SRCS} ${PUB_SRCS}
     LIBS ${GLSLANG_LIBRARIES} ${SPIRV2CROSS_LIBRARY})
 

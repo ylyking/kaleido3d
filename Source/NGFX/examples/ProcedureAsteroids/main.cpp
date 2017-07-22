@@ -3,6 +3,7 @@ https://github.com/GameTechDev/asteroids_d3d12
 Apache License
 */
 #include <Kaleido3D.h>
+#include <KTL/Allocator.hpp>
 #include <ngfx.h>
 
 #if _WIN32
@@ -14,7 +15,7 @@ using namespace ngfx;
 int main()
 {
   Ptr<Factory> factory;
-  CreateFactory(factory.GetAddressOf(), true);
+  CreateFactory(factory.GetAddressOf(), false);
   factory->SetName("VulkanFactory");
 
   Ptr<Device> device;
@@ -67,7 +68,8 @@ int main()
   swapChain->InitWithRenderPass(renderPass.Get());
 
   Ptr<Pipeline> renderPipeline;
-  device->CreateRenderPipeline(nullptr, pipelineLayout.Get(), renderPass.Get(), renderPipeline.GetAddressOf());
+  RenderPipelineDesc renderPipelineDesc;
+  device->CreateRenderPipeline(&renderPipelineDesc, pipelineLayout.Get(), renderPass.Get(), renderPipeline.GetAddressOf());
 
   Ptr<CommandBuffer> commandBuffer = Ptr<CommandBuffer>(queue->CommandBuffer());
   

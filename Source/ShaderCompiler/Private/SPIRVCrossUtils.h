@@ -1,8 +1,8 @@
 #pragma once
 #include <Interface/ICrossShaderCompiler.h>
-#include <spirv2cross/spirv_cross.hpp>
-#include <spirv2cross/spirv_msl.hpp>
-#include <spirv2cross/spirv_glsl.hpp>
+#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross/spirv_msl.hpp>
+#include <spirv_cross/spirv_glsl.hpp>
 
 NGFXShaderDataType spirTypeToRHIAttribType(const spirv_cross::SPIRType& spirType);
 NGFXShaderDataType spirTypeToGlslUniformDataType(const spirv_cross::SPIRType& spirType);

@@ -3,6 +3,7 @@ SimpleCL SPIRV & OpenCL
 */
 #include <Kaleido3D.h>
 #include <ngfx.h>
+#include <Core/Os.h>
 
 #ifdef REFLECTION
 enum class ArgumentAccess
@@ -83,6 +84,18 @@ struct Argument
 
 using namespace ngfx;
 
+void LoadSpv(const char * filePath, void ** ppData, uint32_t * dataSize)
+{
+  Os::File file(filePath);
+  file.Open(IOFlag::IORead);
+  *dataSize = file.GetSize();
+  char* data = new char[*dataSize];
+  file.Read(data, *dataSize);
+  file.Close();
+  *ppData = data;
+}
+
+
 int main()
 {
   Ptr<Factory> factory;
@@ -117,6 +130,14 @@ int main()
 
   Ptr<Compiler> compiler;
   factory->CreateCompiler(ngfx::ShaderLang::HLSL, compiler.GetAddressOf());
+
+  void* pData = nullptr;
+  uint32_t szData = 0;
+  LoadSpv("../../Data/Test/SimpleCL.spv", &pData, &szData);
+
+  Ptr<Reflection> reflect;
+  compiler->Reflect(pData, szData, reflect.GetAddressOf());
+  uint32_t numStorageBuffer = reflect->VariableCount();
 
   Ptr<Function> function;
   ShaderOption shaderOpt = { ShaderType::Compute, ShaderLang::HLSL, "main", ShaderProfile::SM5, ShaderFormat::Text };

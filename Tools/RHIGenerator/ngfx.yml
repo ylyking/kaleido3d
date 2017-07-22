@@ -792,6 +792,126 @@ protype:
           - name: format
             type: shader format
 
+    - data type:
+        type: enum
+        comment: For shader reflection
+        enums:
+            - none
+            - struct
+            - array
+            - pointer
+            - texture
+            - bool
+            - bool2
+            - bool3
+            - bool4
+            - int
+            - int2
+            - int3
+            - int4
+            - uint
+            - uint2
+            - uint3
+            - uint4
+            - float
+            - float2
+            - float3
+            - float4
+            - mat2
+            - mat2x3
+            - mat2x4
+            - mat3x2
+            - mat3
+            - mat3x4
+            - mat4x2
+            - mat4
+
+    - variable type:
+        type: interface
+        comment: For shader reflection
+        inherit: ref counted<false>
+        functions:
+            - get type:
+                return: data type
+        
+    - argument access:
+        type: enum
+        bitmask: true
+        enums:
+            - read only
+            - write only
+
+    - variable:
+        type: interface
+        comment: For shader reflection
+        inherit: ref counted<false>
+        functions:
+            - name:
+                return: const char *
+            - access:
+                return: argument access
+            - type:
+                return: variable type *
+            - index:
+                return: uint32_t
+            - active:
+                return: bool
+
+    - struct type:
+        type: interface
+        comment: Not ready yet
+        inherit: variable type
+
+    - array type:
+        type: interface
+        comment: uniform buffer
+        inherit: variable type
+        functions:
+            - length:
+                return: uint32_t
+            - element type:
+                return: data type
+            - stride:
+                return: uint32_t
+            - elements:
+                return: variable type *
+    
+    - pointer type:
+        type: interface
+        comment: storage class buffer
+        inherit: variable type
+        functions:
+            - access:
+                return: argument access
+            - alignment:
+                return: uint32_t
+            - data size:
+                return: uint32_t
+            - element type:
+                return: data type
+
+    - texture refer type:
+        type: interface
+        inherit: variable type
+        functions:
+            - access:
+                return: argument access
+            - texture data type:
+                return: data type
+            - texture dim:
+                return: texture dimension
+
+    - reflection:
+        type: interface
+        inherit: ref counted<false>
+        functions:
+            - variable count:
+                return: uint32_t
+            - variables:
+                return: variable **
+            - get stage:
+                return: shader type
+            
     - compiler:
         type: interface
         inherit: ref counted<false>
@@ -813,6 +933,8 @@ protype:
                   type: void *
                 - name: size
                   type: uint32_t
+                - name: ppResult
+                  type: reflection **
               return: result
 
     - factory:
@@ -830,13 +952,13 @@ protype:
             - create swapchain:
                 params:
                     - name: desc
-                      type: const swap chain desc *
+                      type: NotNull const swap chain desc *
                     - name: pCommandQueue
-                      type: command queue *
+                      type: NotNull command queue *
                     - name: pWindow
                       type: void *
                     - name: pSwapchain
-                      type: swap chain **
+                      type: NotNull swap chain **
                 return: result
             - create compiler:
                 params:
@@ -1000,7 +1122,7 @@ protype:
             - get desc:
                 params:
                     - name: pDesc
-                      type: device desc *
+                      type: NotNull device desc *
             - create command queue:
                 params:
                     - name: queueType
@@ -1011,76 +1133,76 @@ protype:
             - create shader layout:
                 params:
                     - name: pShaderLayoutDesc
-                      type: const shader layout desc *
+                      type: NotNull const shader layout desc *
                     - name: ppShaderLayout
                       type: shader layout **
                 return: result
             - create pipeline layout:
                 params:
                     - name: pPipelineLayoutDesc
-                      type: const pipeline layout desc *
+                      type: NotNull const pipeline layout desc *
                     - name: ppPipelineLayout
                       type: pipeline layout **
                 return: result
             - create binding table:
                 params:
                     - name: pPipelineLayout
-                      type: pipeline layout *
+                      type: NotNull pipeline layout *
                     - name: ppBindingTable
                       type: binding table **
                 return: result
             - create render pipeline:
                 params:
                     - name: pPipelineDesc
-                      type: const render pipeline desc *
+                      type: NotNull const render pipeline desc *
                     - name: pPipelineLayout
-                      type: pipeline layout *
+                      type: Nullable pipeline layout *
                     - name: pRenderPass
-                      type: render pass *
+                      type: Nullable render pass *
                     - name: pPipelineState
                       type: pipeline **
                 return: result
             - create compute pipeline:
                 params:
                     - name: pComputeFunction
-                      type: function *
+                      type: NotNull function *
                     - name: pPipelineLayout
-                      type: pipeline layout *
+                      type: Nullable pipeline layout *
                     - name: pPipeline
                       type: pipeline **
                 return: result
             - create render pass:
                 params:
                   - name: desc
-                    type: const render pass desc *
+                    type: NotNull const render pass desc *
                   - name: ppRenderpass
                     type: render pass **
                 return: result
             - create render target:
                 params:
                   - name: desc
-                    type: const render target desc *
+                    type: NotNull const render target desc *
                   - name: ppRenderTarget
                     type: render target **
                 return: result
             - create sampler:
                 params:
                     - name: desc
-                      type: const sampler desc*
+                      type: NotNull const sampler desc*
                     - name: pSampler
                       type: sampler **
                 return: result
             - create buffer:
                 params:
                     - name: desc
-                      type: const buffer desc*
+                      type: NotNull const buffer desc*
                     - name: pBuffer
                       type: buffer **
                 return: result
             - create texture:
                 params:
                     - name: desc
-                      type: const texture desc *
+                      type: NotNull const texture desc *
                     - name: pTexture
                       type: texture **
                 return: result

@@ -31,11 +31,29 @@ public:
   VkShaderModuleCreateInfo  ShaderModuleInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
 };
 
+namespace spirv_cross
+{
+  class Compiler;
+}
+
+class V_API SPIRVCrossReflection : public ngfx::Reflection
+{
+public:
+  SPIRVCrossReflection(void* pData, uint32_t size);
+  ~SPIRVCrossReflection();
+  uint32_t          VariableCount() override;
+  ngfx::Variable**  Variables() override;
+  ngfx::ShaderType  GetStage() override;
+private:
+  spirv_cross::Compiler*      m_Reflector;
+  std::vector<ngfx::Variable*> m_Vars;
+};
+
 class V_API GlslangCompiler : public ngfx::Compiler
 {
 public:
   GlslangCompiler();
   ~GlslangCompiler();
   ngfx::Result Compile(const ngfx::ShaderOption * option, void * pData, uint32_t size, ngfx::Function ** output) override;
-  ngfx::Result Reflect(void * pData, uint32_t size) override;
+  ngfx::Result Reflect(void * pData, uint32_t size, ngfx::Reflection ** ppResult) override;
 };

@@ -10,6 +10,6 @@ rendererwidget.cpp
 rendererwidget.h 
 mainwindow.ui)
 
-target_link_libraries(KEditor Qt5::Widgets Qt5::Core Core)
+target_link_libraries(KEditor Qt5::Widgets Qt5::Core Kaleido3D.Core)
 
 set_target_properties(KEditor PROPERTIES FOLDER "Editor")

@@ -36,7 +36,7 @@ void RendererWidget::init()
 
   Queue = Device->CreateCommandQueue(NGFX_COMMAND_GRAPHICS);
 
-  k3d::SwapChainDesc Desc = { 
+  NGFXSwapChainDesc Desc = { 
     NGFX_PIXEL_FORMAT_RGBA8_UNORM_SRGB,
     width(),
     height(),

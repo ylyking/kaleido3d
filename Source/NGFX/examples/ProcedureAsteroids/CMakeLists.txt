@@ -1,3 +1,7 @@
 add_executable(ProcedureAsteroids main.cpp)
-target_link_libraries(ProcedureAsteroids Core ngfx_vulkan)
+if(MACOS)
+  target_link_libraries(ProcedureAsteroids Kaleido3D.Core ngfx_metal)
+else()
+  target_link_libraries(ProcedureAsteroids Kaleido3D.Core ngfx_vulkan)
+endif()
 set_target_properties(ProcedureAsteroids PROPERTIES FOLDER "ngfx/examples")
