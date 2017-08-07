@@ -158,7 +158,6 @@ int main()
   Ptr<CommandBuffer> commandBuffer = Ptr<CommandBuffer>(queue->CommandBuffer());
   Ptr<ComputeCommandEncoder> computeCommand = Ptr<ComputeCommandEncoder>(commandBuffer->ComputeCommandEncoder());
   computeCommand->SetPipeline(computePipeline.Get());
-  computeCommand->SetPipelineLayout(pipelineLayout.Get());
   computeCommand->SetBindingTable(argTable.Get());
   computeCommand->Dispatch(1024, 1024, 1);
   computeCommand->EndEncode();

@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #ifdef BUILD_VULKAN_GLSLANG
 #define V_API __declspec(dllexport)
@@ -11,25 +12,6 @@
 #endif
 
 using ByteCode = std::vector<uint32_t>;
-
-class V_API VulkanFunction : public ngfx::Function
-{
-public:
-  VulkanFunction();
-  ~VulkanFunction();
-  ngfx::ShaderType Type() override;
-  const char * Name() override;
-
-  VkPipelineShaderStageCreateInfo* GetPipelineStageInfo();
-
-  ByteCode                  ByteCodes;
-  std::string               EntryName;
-  std::string               Source;
-  ngfx::ShaderType          ShaderType;
-  VkShaderModule            ShaderModule = VK_NULL_HANDLE;
-  VkPipelineShaderStageCreateInfo StageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-  VkShaderModuleCreateInfo  ShaderModuleInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-};
 
 namespace spirv_cross
 {
@@ -40,20 +22,41 @@ class V_API SPIRVCrossReflection : public ngfx::Reflection
 {
 public:
   SPIRVCrossReflection(void* pData, uint32_t size);
+  explicit SPIRVCrossReflection(const ByteCode&);
   ~SPIRVCrossReflection();
-  uint32_t          VariableCount() override;
-  ngfx::Variable**  Variables() override;
-  ngfx::ShaderType  GetStage() override;
+
+  uint32_t          VariableCount() const override;
+  ngfx::Variable*   VariableAt(uint32_t id) const override;
+  ngfx::ShaderType  GetStage() const override;
+
 private:
+  void DoReflect();
   spirv_cross::Compiler*      m_Reflector;
   std::vector<ngfx::Variable*> m_Vars;
 };
 
-class V_API GlslangCompiler : public ngfx::Compiler
+struct FunctionData
 {
-public:
-  GlslangCompiler();
-  ~GlslangCompiler();
-  ngfx::Result Compile(const ngfx::ShaderOption * option, void * pData, uint32_t size, ngfx::Function ** output) override;
-  ngfx::Result Reflect(void * pData, uint32_t size, ngfx::Reflection ** ppResult) override;
+  ByteCode          ByteCode;
+  ngfx::ShaderType  Stage;
 };
+
+struct EntryInfo
+{
+  char      Name[128];
+  char      Entry[128];
+  uint32_t  ShaderType;
+  uint32_t  Size;
+  uint32_t  OffSet;
+};
+
+using FunctionMap = std::unordered_map<std::string, FunctionData>;
+
+extern V_API 
+ngfx::Result CompileFromSource(const ngfx::CompileOption& Opt, const char* pSource, FunctionMap& FuncMap, std::string& ErrorInfo);
+
+extern V_API
+ngfx::Result ReflectFromSPIRV(ByteCode const&bc, ngfx::Reflection ** ppResult);
+
+extern V_API
+ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path);

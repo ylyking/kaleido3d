@@ -38,6 +38,9 @@ if(MAYA_DIRECTORY)
         set(MAYA_PLUGIN_SUFFIX ".bundle")
         set(MAYA_PLUGIN_TYPE MODULE)
     endif()
+    
+    #set(Qt5_DIR "C:/Program Files/Autodesk/Maya2017/devkit/cmake/Qt5")
+    #find_package(Qt5 COMPONENTS Core Widgets)
 
     include_directories(${MAYA_INCLUDE_DIR})
     link_directories(${MAYA_LIBRARY_DIR})

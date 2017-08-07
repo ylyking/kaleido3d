@@ -1,5 +1,5 @@
 #if USE_GLSLANG
-#include <glslang/GlslangToSpv.h>
+#include <SPIRV/GlslangToSpv.h>
 #else
 #include <shaderc/shaderc.hpp>
 #endif

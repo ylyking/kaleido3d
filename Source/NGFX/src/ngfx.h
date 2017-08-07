@@ -113,6 +113,13 @@ typedef enum ngfxVertexFormat
   NGFX_VERTEX_FORMAT_F32C4,
 } ngfxVertexFormat;
 
+typedef enum ngfxStencilFaceRef
+{
+  NGFX_STENCIL_FACE_REF_FRONT,
+  NGFX_STENCIL_FACE_REF_BACK,
+  NGFX_STENCIL_FACE_REF_FRONT_AND_BACK,
+} ngfxStencilFaceRef;
+
 typedef enum ngfxPrimitiveType
 {
   NGFX_PRIMITIVE_TYPE_POINTS,
@@ -395,6 +402,7 @@ typedef enum ngfxArgumentAccess
 typedef struct _ngfxShaderLayout* ngfxShaderLayout;
 typedef struct _ngfxSwapChain* ngfxSwapChain;
 typedef struct _ngfxFunction* ngfxFunction;
+typedef struct _ngfxLibrary* ngfxLibrary;
 typedef struct _ngfxVariableType* ngfxVariableType;
 typedef struct _ngfxVariable* ngfxVariable;
 typedef struct _ngfxStructType* ngfxStructType;
@@ -407,6 +415,7 @@ typedef struct _ngfxFactory* ngfxFactory;
 typedef struct _ngfxRenderTarget* ngfxRenderTarget;
 typedef struct _ngfxRenderPass* ngfxRenderPass;
 typedef struct _ngfxPipeline* ngfxPipeline;
+typedef struct _ngfxPipelineLibrary* ngfxPipelineLibrary;
 typedef struct _ngfxComputePipeline* ngfxComputePipeline;
 typedef struct _ngfxRenderPipeline* ngfxRenderPipeline;
 typedef struct _ngfxPipelineLayout* ngfxPipelineLayout;
@@ -672,6 +681,15 @@ struct ngfxShaderOption
   ngfxShaderFormat format;
 };
 
+struct ngfxCompileOption
+{
+  Bool32 stripDebugSymbols;
+  Bool32 optimizeSize;
+  ngfxShaderLang language;
+  ngfxShaderProfile profile;
+  ngfxShaderFormat format;
+};
+
 #if __cplusplus
 
 namespace ngfx
@@ -875,6 +893,13 @@ enum class VertexFormat : uint32_t
   F32C3,
   F32C4,
 };// Enum VertexFormat
+
+enum class StencilFaceRef : uint32_t
+{
+  Front,
+  Back,
+  FrontAndBack,
+};// Enum StencilFaceRef
 
 enum class PrimitiveType : uint32_t
 {
@@ -1158,6 +1183,7 @@ enum class ArgumentAccess : uint32_t
 struct ShaderLayout;
 struct SwapChain;
 struct Function;
+struct Library;
 struct VariableType;
 struct Variable;
 struct StructType;
@@ -1170,6 +1196,7 @@ struct Factory;
 struct RenderTarget;
 struct RenderPass;
 struct Pipeline;
+struct PipelineLibrary;
 struct ComputePipeline;
 struct RenderPipeline;
 struct PipelineLayout;
@@ -2384,6 +2411,55 @@ struct ShaderOption
 
 static_assert(sizeof(ShaderOption) == sizeof(ngfxShaderOption), "ShaderOption & ngfxShaderOption Size Not Equal!");
 
+struct CompileOption
+{
+  Bool32 stripDebugSymbols;
+  Bool32 optimizeSize;
+  ShaderLang language;
+  ShaderProfile profile;
+  ShaderFormat format;
+
+  CompileOption(Bool32 _stripDebugSymbols = 0, Bool32 _optimizeSize = 0, ShaderLang _language = ShaderLang::HLSL, ShaderProfile _profile = ShaderProfile::SM4, ShaderFormat _format = ShaderFormat::Text)
+  : stripDebugSymbols(_stripDebugSymbols)
+  , optimizeSize(_optimizeSize)
+  , language(_language)
+  , profile(_profile)
+  , format(_format)
+  {}
+
+  CompileOption& SetStripDebugSymbols(Bool32 _stripDebugSymbols)
+  {
+    stripDebugSymbols = _stripDebugSymbols;
+    return *this;
+  }
+
+  CompileOption& SetOptimizeSize(Bool32 _optimizeSize)
+  {
+    optimizeSize = _optimizeSize;
+    return *this;
+  }
+
+  CompileOption& SetLanguage(ShaderLang _language)
+  {
+    language = _language;
+    return *this;
+  }
+
+  CompileOption& SetProfile(ShaderProfile _profile)
+  {
+    profile = _profile;
+    return *this;
+  }
+
+  CompileOption& SetFormat(ShaderFormat _format)
+  {
+    format = _format;
+    return *this;
+  }
+};
+
+static_assert(sizeof(CompileOption) == sizeof(ngfxCompileOption), "CompileOption & ngfxCompileOption Size Not Equal!");
+
 struct ShaderLayout : public RefCounted<false>
 {
 };
@@ -2400,8 +2476,13 @@ struct SwapChain : public NamedObject<false>
 
 struct Function : public RefCounted<false>
 {
-  virtual ShaderType Type() = 0;
-  virtual const char * Name() = 0;
+  virtual ShaderType Type() const = 0;
+  virtual const char * Name() const = 0;
+};
+
+struct Library : public RefCounted<false>
+{
+  virtual Result MakeFunction(const char * name, Function ** ppFunction) = 0;
 };
 
 // For shader reflection
@@ -2452,9 +2533,9 @@ struct TextureReferType : public VariableType
 
 struct Reflection : public RefCounted<false>
 {
-  virtual uint32_t VariableCount() = 0;
-  virtual Variable ** Variables() = 0;
-  virtual ShaderType GetStage() = 0;
+  virtual uint32_t VariableCount() const = 0;
+  virtual Variable * VariableAt(uint32_t id) const = 0;
+  virtual ShaderType GetStage() const = 0;
 };
 
 struct Compiler : public RefCounted<false>
@@ -2481,7 +2562,15 @@ struct RenderPass : public NamedObject<false>
 
 struct Pipeline : public NamedObject<false>
 {
-  virtual PipelineType Type() = 0;
+  virtual PipelineType Type() const = 0;
+  virtual Result GetCache(uint64_t * pSize, void * pOutData) = 0;
+};
+
+struct PipelineLibrary : public RefCounted<false>
+{
+  virtual void StorePipeline(const char * key, Pipeline * pPipeline) = 0;
+  virtual uint64_t GetSerializedSize() const = 0;
+  virtual void Serialize(void * pData, uint64_t Size) = 0;
 };
 
 struct ComputePipeline : public Pipeline
@@ -2552,6 +2641,8 @@ struct Device : public NamedObject<true>
   virtual Result CreateBindingTable(NotNull PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) = 0;
   virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable PipelineLayout * pPipelineLayout, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
   virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Nullable PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) = 0;
+  virtual Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) = 0;
+  virtual Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) = 0;
   virtual Result CreateRenderPass(NotNull const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;
   virtual Result CreateRenderTarget(NotNull const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) = 0;
   virtual Result CreateSampler(NotNull const SamplerDesc* desc, Sampler ** pSampler) = 0;
@@ -2590,7 +2681,6 @@ struct CommandEncoder : public NamedObject<true>
 {
   virtual void Barrier(Resource * pResource) = 0;
   virtual void SetPipeline(Pipeline* pPipelineState) = 0;
-  virtual void SetPipelineLayout(PipelineLayout * pPipelineLayout) = 0;
   virtual void SetBindingTable(BindingTable * pBindingTable) = 0;
   virtual void EndEncode() = 0;
 };
@@ -2607,9 +2697,13 @@ struct RenderCommandEncoder : public CommandEncoder
 {
   virtual void SetScissorRect(uint32_t x, uint32_t y, uint32_t w, uint32_t h) = 0;
   virtual void SetViewport(const Viewport * pViewport) = 0;
+  virtual void SetDepthBias(Float32 biasConst, Float32 biasClamp, Float32 biasSlope) = 0;
+  virtual void SetDepthBounds(Float32 minDepth, Float32 maxDepth) = 0;
+  virtual void SetStencilReference(StencilFaceRef face, uint32_t value) = 0;
+  virtual void SetBlendConsts(Float32x4 constant) = 0;
+  virtual void SetLineWidth(Float32 width) = 0;
   virtual void SetIndexBuffer(Buffer * pIndexBuffer) = 0;
   virtual void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer) = 0;
-  virtual void SetPrimitiveType(PrimitiveType primitive) = 0;
   virtual void DrawInstanced(const DrawInstancedDesc * drawParam) = 0;
   virtual void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam) = 0;
   virtual void Present(Drawable * pDrawable) = 0;

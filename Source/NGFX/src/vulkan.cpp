@@ -1,5 +1,7 @@
 #include <Kaleido3D.h>
 #include <KTL/Allocator.hpp>
+#include <Core/Os.h>
+
 #if K3DPLATFORM_OS_WIN
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #elif K3DPLATFORM_OS_ANDROID
@@ -14,6 +16,9 @@
 #include <set>
 
 using namespace ngfx;
+
+using Os::File;
+using Os::MemMapFile;
 
 #define VULKAN_ALLOCATOR nullptr
 
@@ -88,6 +93,199 @@ const char * VulkanError(VkResult Result)
 #undef ERROR_STR
 }
 
+const char * StrVkFormat(VkFormat format)
+{
+  switch (format)
+  {
+  case VK_FORMAT_UNDEFINED: return "VK_FORMAT_UNDEFINED";
+  case VK_FORMAT_R4G4_UNORM_PACK8: return "VK_FORMAT_R4G4_UNORM_PACK8";
+  case VK_FORMAT_R4G4B4A4_UNORM_PACK16: return "VK_FORMAT_R4G4B4A4_UNORM_PACK16";
+  case VK_FORMAT_B4G4R4A4_UNORM_PACK16: return "VK_FORMAT_B4G4R4A4_UNORM_PACK16";
+  case VK_FORMAT_R5G6B5_UNORM_PACK16: return "VK_FORMAT_R5G6B5_UNORM_PACK16";
+  case VK_FORMAT_B5G6R5_UNORM_PACK16: return "VK_FORMAT_B5G6R5_UNORM_PACK16";
+  case VK_FORMAT_R5G5B5A1_UNORM_PACK16: return "VK_FORMAT_R5G5B5A1_UNORM_PACK16";
+  case VK_FORMAT_B5G5R5A1_UNORM_PACK16: return "VK_FORMAT_B5G5R5A1_UNORM_PACK16";
+  case VK_FORMAT_A1R5G5B5_UNORM_PACK16: return "VK_FORMAT_A1R5G5B5_UNORM_PACK16";
+  case VK_FORMAT_R8_UNORM: return "VK_FORMAT_R8_UNORM";
+  case VK_FORMAT_R8_SNORM: return "VK_FORMAT_R8_SNORM";
+  case VK_FORMAT_R8_USCALED: return "VK_FORMAT_R8_USCALED";
+  case VK_FORMAT_R8_SSCALED: return "VK_FORMAT_R8_SSCALED";
+  case VK_FORMAT_R8_UINT: return "VK_FORMAT_R8_UINT";
+  case VK_FORMAT_R8_SINT: return "VK_FORMAT_R8_SINT";
+  case VK_FORMAT_R8_SRGB: return "VK_FORMAT_R8_SRGB";
+  case VK_FORMAT_R8G8_UNORM: return "VK_FORMAT_R8G8_UNORM";
+  case VK_FORMAT_R8G8_SNORM: return "VK_FORMAT_R8G8_SNORM";
+  case VK_FORMAT_R8G8_USCALED: return "VK_FORMAT_R8G8_USCALED";
+  case VK_FORMAT_R8G8_SSCALED: return "VK_FORMAT_R8G8_SSCALED";
+  case VK_FORMAT_R8G8_UINT: return "VK_FORMAT_R8G8_UINT";
+  case VK_FORMAT_R8G8_SINT: return "VK_FORMAT_R8G8_SINT";
+  case VK_FORMAT_R8G8_SRGB: return "VK_FORMAT_R8G8_SRGB";
+  case VK_FORMAT_R8G8B8_UNORM: return "VK_FORMAT_R8G8B8_UNORM";
+  case VK_FORMAT_R8G8B8_SNORM: return "VK_FORMAT_R8G8B8_SNORM";
+  case VK_FORMAT_R8G8B8_USCALED: return "VK_FORMAT_R8G8B8_USCALED";
+  case VK_FORMAT_R8G8B8_SSCALED: return "VK_FORMAT_R8G8B8_SSCALED";
+  case VK_FORMAT_R8G8B8_UINT: return "VK_FORMAT_R8G8B8_UINT";
+  case VK_FORMAT_R8G8B8_SINT: return "VK_FORMAT_R8G8B8_SINT";
+  case VK_FORMAT_R8G8B8_SRGB: return "VK_FORMAT_R8G8B8_SRGB";
+  case VK_FORMAT_B8G8R8_UNORM: return "VK_FORMAT_B8G8R8_UNORM";
+  case VK_FORMAT_B8G8R8_SNORM: return "VK_FORMAT_B8G8R8_SNORM";
+  case VK_FORMAT_B8G8R8_USCALED: return "VK_FORMAT_B8G8R8_USCALED";
+  case VK_FORMAT_B8G8R8_SSCALED: return "VK_FORMAT_B8G8R8_SSCALED";
+  case VK_FORMAT_B8G8R8_UINT: return "VK_FORMAT_B8G8R8_UINT";
+  case VK_FORMAT_B8G8R8_SINT: return "VK_FORMAT_B8G8R8_SINT";
+  case VK_FORMAT_B8G8R8_SRGB: return "VK_FORMAT_B8G8R8_SRGB";
+  case VK_FORMAT_R8G8B8A8_UNORM: return "VK_FORMAT_R8G8B8A8_UNORM";
+  case VK_FORMAT_R8G8B8A8_SNORM: return "VK_FORMAT_R8G8B8A8_SNORM";
+  case VK_FORMAT_R8G8B8A8_USCALED: return "VK_FORMAT_R8G8B8A8_USCALED";
+  case VK_FORMAT_R8G8B8A8_SSCALED: return "VK_FORMAT_R8G8B8A8_SSCALED";
+  case VK_FORMAT_R8G8B8A8_UINT: return "VK_FORMAT_R8G8B8A8_UINT";
+  case VK_FORMAT_R8G8B8A8_SINT: return "VK_FORMAT_R8G8B8A8_SINT";
+  case VK_FORMAT_R8G8B8A8_SRGB: return "VK_FORMAT_R8G8B8A8_SRGB";
+  case VK_FORMAT_B8G8R8A8_UNORM: return "VK_FORMAT_B8G8R8A8_UNORM";
+  case VK_FORMAT_B8G8R8A8_SNORM: return "VK_FORMAT_B8G8R8A8_SNORM";
+  case VK_FORMAT_B8G8R8A8_USCALED: return "VK_FORMAT_B8G8R8A8_USCALED";
+  case VK_FORMAT_B8G8R8A8_SSCALED: return "VK_FORMAT_B8G8R8A8_SSCALED";
+  case VK_FORMAT_B8G8R8A8_UINT: return "VK_FORMAT_B8G8R8A8_UINT";
+  case VK_FORMAT_B8G8R8A8_SINT: return "VK_FORMAT_B8G8R8A8_SINT";
+  case VK_FORMAT_B8G8R8A8_SRGB: return "VK_FORMAT_B8G8R8A8_SRGB";
+  case VK_FORMAT_A8B8G8R8_UNORM_PACK32: return "VK_FORMAT_A8B8G8R8_UNORM_PACK32";
+  case VK_FORMAT_A8B8G8R8_SNORM_PACK32: return "VK_FORMAT_A8B8G8R8_SNORM_PACK32";
+  case VK_FORMAT_A8B8G8R8_USCALED_PACK32: return "VK_FORMAT_A8B8G8R8_USCALED_PACK32";
+  case VK_FORMAT_A8B8G8R8_SSCALED_PACK32: return "VK_FORMAT_A8B8G8R8_SSCALED_PACK32";
+  case VK_FORMAT_A8B8G8R8_UINT_PACK32: return "VK_FORMAT_A8B8G8R8_UINT_PACK32";
+  case VK_FORMAT_A8B8G8R8_SINT_PACK32: return "VK_FORMAT_A8B8G8R8_SINT_PACK32";
+  case VK_FORMAT_A8B8G8R8_SRGB_PACK32: return "VK_FORMAT_A8B8G8R8_SRGB_PACK32";
+  case VK_FORMAT_A2R10G10B10_UNORM_PACK32: return "VK_FORMAT_A2R10G10B10_UNORM_PACK32";
+  case VK_FORMAT_A2R10G10B10_SNORM_PACK32: return "VK_FORMAT_A2R10G10B10_SNORM_PACK32";
+  case VK_FORMAT_A2R10G10B10_USCALED_PACK32: return "VK_FORMAT_A2R10G10B10_USCALED_PACK32";
+  case VK_FORMAT_A2R10G10B10_SSCALED_PACK32: return "VK_FORMAT_A2R10G10B10_SSCALED_PACK32";
+  case VK_FORMAT_A2R10G10B10_UINT_PACK32: return "VK_FORMAT_A2R10G10B10_UINT_PACK32";
+  case VK_FORMAT_A2R10G10B10_SINT_PACK32: return "VK_FORMAT_A2R10G10B10_SINT_PACK32";
+  case VK_FORMAT_A2B10G10R10_UNORM_PACK32: return "VK_FORMAT_A2B10G10R10_UNORM_PACK32";
+  case VK_FORMAT_A2B10G10R10_SNORM_PACK32: return "VK_FORMAT_A2B10G10R10_SNORM_PACK32";
+  case VK_FORMAT_A2B10G10R10_USCALED_PACK32: return "VK_FORMAT_A2B10G10R10_USCALED_PACK32";
+  case VK_FORMAT_A2B10G10R10_SSCALED_PACK32: return "VK_FORMAT_A2B10G10R10_SSCALED_PACK32";
+  case VK_FORMAT_A2B10G10R10_UINT_PACK32: return "VK_FORMAT_A2B10G10R10_UINT_PACK32";
+  case VK_FORMAT_A2B10G10R10_SINT_PACK32: return "VK_FORMAT_A2B10G10R10_SINT_PACK32";
+  case VK_FORMAT_R16_UNORM: return "VK_FORMAT_R16_UNORM";
+  case VK_FORMAT_R16_SNORM: return "VK_FORMAT_R16_SNORM";
+  case VK_FORMAT_R16_USCALED: return "VK_FORMAT_R16_USCALED";
+  case VK_FORMAT_R16_SSCALED: return "VK_FORMAT_R16_SSCALED";
+  case VK_FORMAT_R16_UINT: return "VK_FORMAT_R16_UINT";
+  case VK_FORMAT_R16_SINT: return "VK_FORMAT_R16_SINT";
+  case VK_FORMAT_R16_SFLOAT: return "VK_FORMAT_R16_SFLOAT";
+  case VK_FORMAT_R16G16_UNORM: return "VK_FORMAT_R16G16_UNORM";
+  case VK_FORMAT_R16G16_SNORM: return "VK_FORMAT_R16G16_SNORM";
+  case VK_FORMAT_R16G16_USCALED: return "VK_FORMAT_R16G16_USCALED";
+  case VK_FORMAT_R16G16_SSCALED: return "VK_FORMAT_R16G16_SSCALED";
+  case VK_FORMAT_R16G16_UINT: return "VK_FORMAT_R16G16_UINT";
+  case VK_FORMAT_R16G16_SINT: return "VK_FORMAT_R16G16_SINT";
+  case VK_FORMAT_R16G16_SFLOAT: return "VK_FORMAT_R16G16_SFLOAT";
+  case VK_FORMAT_R16G16B16_UNORM: return "VK_FORMAT_R16G16B16_UNORM";
+  case VK_FORMAT_R16G16B16_SNORM: return "VK_FORMAT_R16G16B16_SNORM";
+  case VK_FORMAT_R16G16B16_USCALED: return "VK_FORMAT_R16G16B16_USCALED";
+  case VK_FORMAT_R16G16B16_SSCALED: return "VK_FORMAT_R16G16B16_SSCALED";
+  case VK_FORMAT_R16G16B16_UINT: return "VK_FORMAT_R16G16B16_UINT";
+  case VK_FORMAT_R16G16B16_SINT: return "VK_FORMAT_R16G16B16_SINT";
+  case VK_FORMAT_R16G16B16_SFLOAT: return "VK_FORMAT_R16G16B16_SFLOAT";
+  case VK_FORMAT_R16G16B16A16_UNORM: return "VK_FORMAT_R16G16B16A16_UNORM";
+  case VK_FORMAT_R16G16B16A16_SNORM: return "VK_FORMAT_R16G16B16A16_SNORM";
+  case VK_FORMAT_R16G16B16A16_USCALED: return "VK_FORMAT_R16G16B16A16_USCALED";
+  case VK_FORMAT_R16G16B16A16_SSCALED: return "VK_FORMAT_R16G16B16A16_SSCALED";
+  case VK_FORMAT_R16G16B16A16_UINT: return "VK_FORMAT_R16G16B16A16_UINT";
+  case VK_FORMAT_R16G16B16A16_SINT: return "VK_FORMAT_R16G16B16A16_SINT";
+  case VK_FORMAT_R16G16B16A16_SFLOAT: return "VK_FORMAT_R16G16B16A16_SFLOAT";
+  case VK_FORMAT_R32_UINT: return "VK_FORMAT_R32_UINT";
+  case VK_FORMAT_R32_SINT: return "VK_FORMAT_R32_SINT";
+  case VK_FORMAT_R32_SFLOAT: return "VK_FORMAT_R32_SFLOAT";
+  case VK_FORMAT_R32G32_UINT: return "VK_FORMAT_R32G32_UINT";
+  case VK_FORMAT_R32G32_SINT: return "VK_FORMAT_R32G32_SINT";
+  case VK_FORMAT_R32G32_SFLOAT: return "VK_FORMAT_R32G32_SFLOAT";
+  case VK_FORMAT_R32G32B32_UINT: return "VK_FORMAT_R32G32B32_UINT";
+  case VK_FORMAT_R32G32B32_SINT: return "VK_FORMAT_R32G32B32_SINT";
+  case VK_FORMAT_R32G32B32_SFLOAT: return "VK_FORMAT_R32G32B32_SFLOAT";
+  case VK_FORMAT_R32G32B32A32_UINT: return "VK_FORMAT_R32G32B32A32_UINT";
+  case VK_FORMAT_R32G32B32A32_SINT: return "VK_FORMAT_R32G32B32A32_SINT";
+  case VK_FORMAT_R32G32B32A32_SFLOAT: return "VK_FORMAT_R32G32B32A32_SFLOAT";
+  case VK_FORMAT_R64_UINT: return "VK_FORMAT_R64_UINT";
+  case VK_FORMAT_R64_SINT: return "VK_FORMAT_R64_SINT";
+  case VK_FORMAT_R64_SFLOAT: return "VK_FORMAT_R64_SFLOAT";
+  case VK_FORMAT_R64G64_UINT: return "VK_FORMAT_R64G64_UINT";
+  case VK_FORMAT_R64G64_SINT: return "VK_FORMAT_R64G64_SINT";
+  case VK_FORMAT_R64G64_SFLOAT: return "VK_FORMAT_R64G64_SFLOAT";
+  case VK_FORMAT_R64G64B64_UINT: return "VK_FORMAT_R64G64B64_UINT";
+  case VK_FORMAT_R64G64B64_SINT: return "VK_FORMAT_R64G64B64_SINT";
+  case VK_FORMAT_R64G64B64_SFLOAT: return "VK_FORMAT_R64G64B64_SFLOAT";
+  case VK_FORMAT_R64G64B64A64_UINT: return "VK_FORMAT_R64G64B64A64_UINT";
+  case VK_FORMAT_R64G64B64A64_SINT: return "VK_FORMAT_R64G64B64A64_SINT";
+  case VK_FORMAT_R64G64B64A64_SFLOAT: return "VK_FORMAT_R64G64B64A64_SFLOAT";
+  case VK_FORMAT_B10G11R11_UFLOAT_PACK32: return "VK_FORMAT_B10G11R11_UFLOAT_PACK32";
+  case VK_FORMAT_E5B9G9R9_UFLOAT_PACK32: return "VK_FORMAT_E5B9G9R9_UFLOAT_PACK32";
+  case VK_FORMAT_D16_UNORM: return "VK_FORMAT_D16_UNORM";
+  case VK_FORMAT_X8_D24_UNORM_PACK32: return "VK_FORMAT_X8_D24_UNORM_PACK32";
+  case VK_FORMAT_D32_SFLOAT: return "VK_FORMAT_D32_SFLOAT";
+  case VK_FORMAT_S8_UINT: return "VK_FORMAT_S8_UINT";
+  case VK_FORMAT_D16_UNORM_S8_UINT: return "VK_FORMAT_D16_UNORM_S8_UINT";
+  case VK_FORMAT_D24_UNORM_S8_UINT: return "VK_FORMAT_D24_UNORM_S8_UINT";
+  case VK_FORMAT_D32_SFLOAT_S8_UINT: return "VK_FORMAT_D32_SFLOAT_S8_UINT";
+  case VK_FORMAT_BC1_RGB_UNORM_BLOCK: return "VK_FORMAT_BC1_RGB_UNORM_BLOCK";
+  case VK_FORMAT_BC1_RGB_SRGB_BLOCK: return "VK_FORMAT_BC1_RGB_SRGB_BLOCK";
+  case VK_FORMAT_BC1_RGBA_UNORM_BLOCK: return "VK_FORMAT_BC1_RGBA_UNORM_BLOCK";
+  case VK_FORMAT_BC1_RGBA_SRGB_BLOCK: return "VK_FORMAT_BC1_RGBA_SRGB_BLOCK";
+  case VK_FORMAT_BC2_UNORM_BLOCK: return "VK_FORMAT_BC2_UNORM_BLOCK";
+  case VK_FORMAT_BC2_SRGB_BLOCK: return "VK_FORMAT_BC2_SRGB_BLOCK";
+  case VK_FORMAT_BC3_UNORM_BLOCK: return "VK_FORMAT_BC3_UNORM_BLOCK";
+  case VK_FORMAT_BC3_SRGB_BLOCK: return "VK_FORMAT_BC3_SRGB_BLOCK";
+  case VK_FORMAT_BC4_UNORM_BLOCK: return "VK_FORMAT_BC4_UNORM_BLOCK";
+  case VK_FORMAT_BC4_SNORM_BLOCK: return "VK_FORMAT_BC4_SNORM_BLOCK";
+  case VK_FORMAT_BC5_UNORM_BLOCK: return "VK_FORMAT_BC5_UNORM_BLOCK";
+  case VK_FORMAT_BC5_SNORM_BLOCK: return "VK_FORMAT_BC5_SNORM_BLOCK";
+  case VK_FORMAT_BC6H_UFLOAT_BLOCK: return "VK_FORMAT_BC6H_UFLOAT_BLOCK";
+  case VK_FORMAT_BC6H_SFLOAT_BLOCK: return "VK_FORMAT_BC6H_SFLOAT_BLOCK";
+  case VK_FORMAT_BC7_UNORM_BLOCK: return "VK_FORMAT_BC7_UNORM_BLOCK";
+  case VK_FORMAT_BC7_SRGB_BLOCK: return "VK_FORMAT_BC7_SRGB_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK: return "VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK: return "VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK: return "VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK: return "VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK: return "VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK";
+  case VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK: return "VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK";
+  case VK_FORMAT_EAC_R11_UNORM_BLOCK: return "VK_FORMAT_EAC_R11_UNORM_BLOCK";
+  case VK_FORMAT_EAC_R11_SNORM_BLOCK: return "VK_FORMAT_EAC_R11_SNORM_BLOCK";
+  case VK_FORMAT_EAC_R11G11_UNORM_BLOCK: return "VK_FORMAT_EAC_R11G11_UNORM_BLOCK";
+  case VK_FORMAT_EAC_R11G11_SNORM_BLOCK: return "VK_FORMAT_EAC_R11G11_SNORM_BLOCK";
+  case VK_FORMAT_ASTC_4x4_UNORM_BLOCK: return "VK_FORMAT_ASTC_4x4_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_4x4_SRGB_BLOCK: return "VK_FORMAT_ASTC_4x4_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_5x4_UNORM_BLOCK: return "VK_FORMAT_ASTC_5x4_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_5x4_SRGB_BLOCK: return "VK_FORMAT_ASTC_5x4_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_5x5_UNORM_BLOCK: return "VK_FORMAT_ASTC_5x5_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_5x5_SRGB_BLOCK: return "VK_FORMAT_ASTC_5x5_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_6x5_UNORM_BLOCK: return "VK_FORMAT_ASTC_6x5_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_6x5_SRGB_BLOCK: return "VK_FORMAT_ASTC_6x5_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_6x6_UNORM_BLOCK: return "VK_FORMAT_ASTC_6x6_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_6x6_SRGB_BLOCK: return "VK_FORMAT_ASTC_6x6_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_8x5_UNORM_BLOCK: return "VK_FORMAT_ASTC_8x5_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_8x5_SRGB_BLOCK: return "VK_FORMAT_ASTC_8x5_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_8x6_UNORM_BLOCK: return "VK_FORMAT_ASTC_8x6_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_8x6_SRGB_BLOCK: return "VK_FORMAT_ASTC_8x6_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_8x8_UNORM_BLOCK: return "VK_FORMAT_ASTC_8x8_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_8x8_SRGB_BLOCK: return "VK_FORMAT_ASTC_8x8_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_10x5_UNORM_BLOCK: return "VK_FORMAT_ASTC_10x5_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_10x5_SRGB_BLOCK: return "VK_FORMAT_ASTC_10x5_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_10x6_UNORM_BLOCK: return "VK_FORMAT_ASTC_10x6_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_10x6_SRGB_BLOCK: return "VK_FORMAT_ASTC_10x6_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_10x8_UNORM_BLOCK: return "VK_FORMAT_ASTC_10x8_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_10x8_SRGB_BLOCK: return "VK_FORMAT_ASTC_10x8_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_10x10_UNORM_BLOCK: return "VK_FORMAT_ASTC_10x10_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_10x10_SRGB_BLOCK: return "VK_FORMAT_ASTC_10x10_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_12x10_UNORM_BLOCK: return "VK_FORMAT_ASTC_12x10_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_12x10_SRGB_BLOCK: return "VK_FORMAT_ASTC_12x10_SRGB_BLOCK";
+  case VK_FORMAT_ASTC_12x12_UNORM_BLOCK: return "VK_FORMAT_ASTC_12x12_UNORM_BLOCK";
+  case VK_FORMAT_ASTC_12x12_SRGB_BLOCK: return "VK_FORMAT_ASTC_12x12_SRGB_BLOCK";
+  }
+  return "Unknown VkFormat";
+}
+
 const char* DeviceType(VkPhysicalDeviceType DType)
 {
   switch (DType)
@@ -113,6 +311,23 @@ const char* DeviceType(VkPhysicalDeviceType DType)
     LogPrint(Log::Error, "CheckRet", "%s !!\n\tReturn Error: %s @line: %d @file: %s.\n", #Ret, VulkanError(Ret), __LINE__, __FILE__); \
   }
 
+VkShaderStageFlagBits ConvertShaderTypeToVulkanEnum(ShaderType const& e) {
+  switch (e) {
+  case ShaderType::Vertex:
+    return VK_SHADER_STAGE_VERTEX_BIT;
+  case ShaderType::Fragment:
+    return VK_SHADER_STAGE_FRAGMENT_BIT;
+  case ShaderType::Compute:
+    return VK_SHADER_STAGE_COMPUTE_BIT;
+  case ShaderType::Geometry:
+    return VK_SHADER_STAGE_GEOMETRY_BIT;
+  case ShaderType::TessailationEval:
+    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+  case ShaderType::TessailationControl:
+    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+  }
+  return VK_SHADER_STAGE_ALL;
+}
 VkFormat ConvertPixelFormatToVulkanEnum(PixelFormat const& e) {
   switch (e) {
   case PixelFormat::RGBA16Uint:
@@ -284,6 +499,81 @@ public:
 };
 */
 
+/*
+class VulkanDescriptorSet
+{
+public:
+  VkDescriptorSet Handle = VK_NULL_HANDLE;
+};
+*/
+using ByteCode = std::vector<uint32_t>;
+
+class VulkanDevice;
+class VulkanLibrary1;
+
+class VulkanFunction1 : public ngfx::Function
+{
+public:
+  VulkanFunction1(VulkanLibrary1* pLibrary, const char * name);
+  ~VulkanFunction1() override;
+
+  ShaderType Type() const override;
+  const char * Name() const override;
+
+  VulkanLibrary1* Library;
+  VkPipelineShaderStageCreateInfo StageInfo;
+
+private:
+  std::string           EntryName;
+  std::string           Source;
+  ngfx::ShaderType      ShaderType;
+  VkShaderModule        ShaderModule = VK_NULL_HANDLE;
+};
+
+/**
+ * Support Multi-Entry SPIRV
+ */
+class VulkanLibrary1 : public ngfx::Library
+{
+  friend class VulkanFunction1;
+public:
+  VulkanLibrary1(VulkanDevice* pDevice, const void *pBlobData, uint64 Size);
+  VulkanLibrary1(VulkanDevice* pDevice, const char *pFilePath);
+  ~VulkanLibrary1() override;
+
+  Result MakeFunction(const char * name, Function ** ppFunction) override;
+protected:
+  void Init(const void *pBlobData, uint64 Size);
+  
+private:
+  FunctionMap DataBlob;
+  VulkanDevice* Device;
+};
+
+class VulkanDescriptorLayout
+{
+public:
+  VulkanDescriptorLayout(VulkanDevice* pDevice, VkDescriptorSetLayoutBinding*, int);
+  ~VulkanDescriptorLayout();
+
+  VkDescriptorSetLayoutCreateInfo Info = {
+    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
+  };
+  VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
+  VulkanDevice* Device;
+};
+
+class VulkanDescriptorPool
+{
+public:
+  VulkanDescriptorPool(VulkanDevice* pDevice, uint64_t MaxSet);
+  ~VulkanDescriptorPool();
+
+
+  VkDescriptorPool Handle = VK_NULL_HANDLE;
+  VulkanDevice* Device;
+};
+
 class VulkanCommandBuffer : public CommandBuffer
 {
 protected:
@@ -305,14 +595,15 @@ class TCmdEncoder : public T
 public:
   using Super = TCmdEncoder<T>;
 
-  TCmdEncoder(VulkanCommandBuffer* pCmd);
+  TCmdEncoder(VulkanCommandBuffer* pCmd, VkPipelineBindPoint BindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS);
   virtual ~TCmdEncoder();
 
   void Barrier(Resource * pResource) override;
   void SetPipeline(Pipeline* pPipelineState) override;
-  void SetPipelineLayout(PipelineLayout * pPipelineLayout) override;
   void SetBindingTable(BindingTable * pBindingTable) override;
   virtual void EndEncode() override;
+
+  VkPipelineBindPoint CurrentBindingPoint;
 
   VulkanCommandBuffer* OwningCommand = nullptr;
 };
@@ -342,9 +633,15 @@ public:
 
   void SetScissorRect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
   void SetViewport(const Viewport * pViewport);
+  void SetDepthBias(Float32 biasConst, Float32 biasClamp, Float32 biasSlope) override;
+  void SetDepthBounds(Float32 minDepth, Float32 maxDepth) override;
+  void SetStencilReference(StencilFaceRef face, uint32_t value) override;
+  void SetBlendConsts(Float32x4 constant) override;
+  void SetLineWidth(Float32 width) override;
+
   void SetIndexBuffer(Buffer * pIndexBuffer);
   void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer);
-  void SetPrimitiveType(PrimitiveType primitive);
+
   void DrawInstanced(const DrawInstancedDesc * drawParam);
   void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam);
   void Present(Drawable * pDrawable);
@@ -365,28 +662,105 @@ public:
 
 class VulkanRenderPass : public RenderPass
 {
-protected:
-  VulkanDevice* OwningRoot;
-private:
+public:
+  VulkanRenderPass(VulkanDevice* pDevice, const RenderPassDesc* pDesc);
+  ~VulkanRenderPass() override;
+  VulkanDevice* Device;
   VkRenderPass Handle = VK_NULL_HANDLE;
 };
+
+template <class T>
+struct PipelineTrait
+{
+};
+
+template <>
+struct PipelineTrait<RenderPipeline>
+{
+  using CreateInfo = VkGraphicsPipelineCreateInfo;
+  static decltype(vkCreateGraphicsPipelines)* Create;
+  static PipelineType Type;
+};
+
+decltype(vkCreateGraphicsPipelines)* PipelineTrait<RenderPipeline>::Create = &vkCreateGraphicsPipelines;
+PipelineType PipelineTrait<RenderPipeline>::Type = PipelineType::Graphics;
+
+template <>
+struct PipelineTrait<ComputePipeline>
+{
+  using CreateInfo = VkComputePipelineCreateInfo;
+  static decltype(vkCreateComputePipelines)* Create;
+  static PipelineType Type;
+};
+
+decltype(vkCreateComputePipelines)* PipelineTrait<ComputePipeline>::Create = &vkCreateComputePipelines;
+PipelineType PipelineTrait<ComputePipeline>::Type = PipelineType::Compute;
 
 template <class T>
 class TPipeline : public T
 {
 public:
-  using Super = typename TPipeline<T>;
 
   TPipeline(VulkanDevice * pDevice);
   virtual ~TPipeline() override;
 
-protected:
-  VulkanDevice* OwningDevice = nullptr;
+  Result GetCache(uint64_t * pSize, void * pOutData) override
+  {
+    RetrieveCache(pOutData, pSize);
+    return Result::Ok;
+  }
+
+  PipelineType Type() const override
+  {
+    return PipelineTrait<T>::Type;
+  }
 
   VkPipeline Handle = VK_NULL_HANDLE;
+
+protected:
+  using Super = typename TPipeline<T>;
+  
+  VulkanDevice* OwningDevice = nullptr;
   VkPipelineCache Cache = VK_NULL_HANDLE;
+  typename PipelineTrait<T>::CreateInfo Info;
+
+  VkResult CreatePipelineCache(void const* InData, uint64 InSize)
+  {
+    VkPipelineCacheCreateInfo Info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, InSize, InData};
+    return vkCreatePipelineCache(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Cache);
+  }
+  
+  VkResult CreatePipeline()
+  {
+    return PipelineTrait<T>::Create(OwningDevice->Handle, Cache, 1, &Info, VULKAN_ALLOCATOR, &Handle);
+  }
+
+  VkResult RetrieveCache(void* OutData, uint64* OutSize)
+  {
+    if (Cache)
+    {
+      return vkGetPipelineCacheData(OwningDevice->Handle, Cache, OutSize, OutData);
+    }
+    //vkMergePipelineCaches(OwningDevice->Handle)
+    return VK_RESULT_MAX_ENUM;
+  }
 
 private:
+  friend class VulkanPipelineLibrary;
+};
+
+class VulkanPipelineLibrary : public PipelineLibrary
+{
+public:
+  VulkanPipelineLibrary(VulkanDevice* pDevice, const void* InData, uint64_t Size);
+  ~VulkanPipelineLibrary() override;
+
+  void StorePipeline(const char * key, Pipeline * pPipeline) override;
+  uint64_t GetSerializedSize() const override;
+  void Serialize(void * pData, uint64_t Size) override;
+
+  VkPipelineCache Handle;
+  VulkanDevice* Device;
 };
 
 class VulkanRenderPipeline : public TPipeline<RenderPipeline>
@@ -394,9 +768,24 @@ class VulkanRenderPipeline : public TPipeline<RenderPipeline>
 public:
   VulkanRenderPipeline(VulkanDevice* pDevice, const RenderPipelineDesc* pDesc, RenderPass * pRenderPass, PipelineLayout * pLayout);
   ~VulkanRenderPipeline() override;
-  Result GetDesc(RenderPipelineDesc * pDesc);
+  Result GetDesc(RenderPipelineDesc * pDesc) override;
+
 protected:
+  void InitShaderStages(const RenderPipelineDesc* pDesc);
+
 private:
+  /* shaders */
+  std::vector<VkPipelineShaderStageCreateInfo> Stages;
+
+  VkPipelineVertexInputStateCreateInfo    VertexInputState;
+  VkPipelineInputAssemblyStateCreateInfo  InputAssemblyState;
+  VkPipelineTessellationStateCreateInfo   TessellationState;
+  VkPipelineViewportStateCreateInfo       ViewportState;
+  VkPipelineRasterizationStateCreateInfo  RasterizationState;
+  VkPipelineMultisampleStateCreateInfo    MultisampleState;
+  VkPipelineDepthStencilStateCreateInfo   DepthStencilState;
+  VkPipelineColorBlendStateCreateInfo     BlendState;
+  VkPipelineDynamicStateCreateInfo        DynamicState;
 };
 
 class VulkanComputePipeline : public TPipeline<ComputePipeline>
@@ -592,7 +981,7 @@ public:
   Result CreateBindingTable(BindingTable ** ppBindingTable) override;
 
   VkPipelineLayout Handle = VK_NULL_HANDLE;
-  VulkanDevice* OwningDevice = nullptr;
+  VulkanDevice* Device = nullptr;
 
   friend class VulkanDevice;
 };
@@ -652,6 +1041,8 @@ public:
   Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) override;
   Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) override;
   Result CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) override;
+  Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) override;
+  Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) override;
   Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) override;
   Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) override;
   Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) override;
@@ -659,6 +1050,7 @@ public:
   Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) override;
   Result CreateFence(Fence ** ppFence) override;
   void WaitIdle() override;
+  bool SupportAsyncCompute() const { return IsSupportAsyncCompute; }
 
   VkDevice Handle = VK_NULL_HANDLE;
 
@@ -672,8 +1064,10 @@ private:
   };
 
   VkPhysicalDevice Device = VK_NULL_HANDLE;
+  VkPhysicalDeviceFeatures Features;
   VmaAllocator MemoryAllocator = nullptr;
   std::vector<QueueInfo> QueueInfos;
+  bool IsSupportAsyncCompute;
 
 protected:
   VulkanFactory* OwningRoot;
@@ -821,6 +1215,11 @@ VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
   if (((uint32_t)usage & (uint32_t)TextureViewBit::RenderTarget))
   {
     Info.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    if (pDesc->option != StorageOption::Private)
+    {
+      LogPrint(Log::Error, "Texture", "When Texture used as RenderTarget, StorageOption should be PRIVATE!\n");
+      assert(0);
+    }
   }
   if (((uint32_t)usage & (uint32_t)TextureViewBit::DepthStencil))
   {
@@ -839,6 +1238,15 @@ VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
     Info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
   }
   
+  if (pDesc->option == StorageOption::Managed ||
+    pDesc->option == StorageOption::Shared)
+  {
+    Info.tiling = VK_IMAGE_TILING_LINEAR;
+  }
+  else if (pDesc->option == StorageOption::Private)
+  {
+    Info.tiling = VK_IMAGE_TILING_OPTIMAL;
+  }
   Info.initialLayout;
 
   Info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -893,6 +1301,11 @@ public:
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
     layers.resize(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
+    LogPrint(Log::Info, "Factory", "DumpingLayers:\n");
+    for(auto l : layers)
+    {
+      LogPrint(Log::Info, "Factory", "\t%s Desc:%s\n", l.layerName, l.description);
+    }
 
     uint32_t layerExtPropCount = 0;
     std::vector<VkExtensionProperties> extProps;
@@ -950,25 +1363,27 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   VkPhysicalDeviceProperties Prop;
   vkGetPhysicalDeviceProperties(Device, &Prop);
 
-  LogPrint(Log::Info, "Device", "Vendor: %s Type: %s API Version: %d.%d.%d\n",
-    Prop.deviceName,
-    DeviceType(Prop.deviceType),
-    VK_VERSION_MAJOR(Prop.apiVersion),
-    VK_VERSION_MINOR(Prop.apiVersion), 
-    VK_VERSION_PATCH(Prop.apiVersion));
-
-
   // Create Command Queue
   float QueuePriority = 0.0f;
   std::vector<VkDeviceQueueCreateInfo> DeviceQueueInfo;
   DeviceQueueInfo.resize(queueCount);
   std::vector<float*> QueuePriorities;
   // Async Compute & Transfer
+  uint32_t GfxQueueId = 0;
+  uint32_t CptQueueId = 0;
   for (uint32 Id = 0; Id < queueCount; Id++)
   {
     QueueInfos[Id].Family = Id;
     QueueInfos[Id].Flags = QueueFamilyProps[Id].queueFlags;
     QueueInfos[Id].Count = QueueFamilyProps[Id].queueCount;
+    if(QueueFamilyProps[Id].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+    {
+      GfxQueueId = Id;
+    }
+    if (QueueFamilyProps[Id].queueFlags & VK_QUEUE_COMPUTE_BIT)
+    {
+      CptQueueId = Id;
+    }
     DeviceQueueInfo[Id].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     DeviceQueueInfo[Id].pNext = nullptr;
     DeviceQueueInfo[Id].flags = 0;
@@ -978,6 +1393,14 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
     DeviceQueueInfo[Id].pQueuePriorities = Priorities;
     QueuePriorities.push_back(Priorities);
   }
+  IsSupportAsyncCompute = GfxQueueId != CptQueueId;
+
+  LogPrint(Log::Info, "Device", "Vendor: %s\n\tType: %s\n\tVulkan: %d.%d.%d\n\tAsyncCompute:%d\n",
+    Prop.deviceName,
+    DeviceType(Prop.deviceType),
+    VK_VERSION_MAJOR(Prop.apiVersion),
+    VK_VERSION_MINOR(Prop.apiVersion),
+    VK_VERSION_PATCH(Prop.apiVersion), IsSupportAsyncCompute);
 
   uint32_t extCount = 0;
   std::vector<VkExtensionProperties> exts;
@@ -985,9 +1408,11 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   exts.resize(extCount);
   vkEnumerateDeviceExtensionProperties(Device, nullptr, &extCount, exts.data());
   std::set<std::string> deviceExtensions;
+  LogPrint(Log::Info, "Device", "DumpVulkanDeviceExtensions:\n");
   for (auto ext : exts)
   {
     deviceExtensions.insert(ext.extensionName);
+    LogPrint(Log::Info, "Device", "\t%s\n", ext.extensionName);
   }
 
   uint32_t layerCount = 0;
@@ -996,13 +1421,15 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   layers.resize(layerCount);
   vkEnumerateDeviceLayerProperties(Device, &layerCount, layers.data());
 
+  vkGetPhysicalDeviceFeatures(Device, &Features);
+
   // KHX ?
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   deviceCreateInfo.pNext = NULL;
   deviceCreateInfo.queueCreateInfoCount = DeviceQueueInfo.size();
   deviceCreateInfo.pQueueCreateInfos = DeviceQueueInfo.data();
-  //deviceCreateInfo.pEnabledFeatures = &m_Features;
+  deviceCreateInfo.pEnabledFeatures = &Features;
   if (OwningRoot->Debug)
   {
     if (deviceExtensions.find(VK_EXT_DEBUG_MARKER_EXTENSION_NAME) != deviceExtensions.end())
@@ -1150,6 +1577,10 @@ VulkanSwapChain::VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const S
   CreateInfo.clipped = VK_TRUE;
   CreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 
+  CreateInfo.imageFormat = ConvertPixelFormatToVulkanEnum(pDesc->pixelFormat);
+  CreateInfo.imageExtent = { pDesc->width, pDesc->height };
+  CreateInfo.minImageCount = pDesc->numColorBuffers;
+
 #if K3DPLATFORM_OS_WIN
   VkWin32SurfaceCreateInfoKHR SurfaceCreateInfo = {};
   SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -1158,6 +1589,10 @@ VulkanSwapChain::VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const S
   vkCreateWin32SurfaceKHR(OwningRoot->Handle, &SurfaceCreateInfo, VULKAN_ALLOCATOR, &Surface);
 #endif
   
+  CreateInfo.surface = Surface;
+
+  LogPrint(Log::Info, "SwapChain", "Chosen SwapChain Format %s.\n", StrVkFormat(CreateInfo.imageFormat));
+
   vkCreateSwapchainKHR(OwningDevice->Handle, &CreateInfo, VULKAN_ALLOCATOR, &Handle);
 }
 
@@ -1177,7 +1612,7 @@ Result VulkanFactory::CreateSwapchain(const SwapChainDesc* desc, CommandQueue* p
 
 Result VulkanFactory::CreateCompiler(ShaderLang shaderLang, Compiler ** compiler)
 {
-  *compiler = new GlslangCompiler;
+//  *compiler = new GlslangCompiler;
   return Result::Ok;
 }
 
@@ -1234,8 +1669,100 @@ Result VulkanDevice::CreateComputePipeline(Function * pComputeFunction, Pipeline
   return Result::Ok;
 }
 
+Result VulkanDevice::CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary)
+{
+  *ppPipelineLibrary = new VulkanPipelineLibrary(this, pData, Size);
+  return Result::Ok;
+}
+
+Result VulkanDevice::CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary)
+{
+  * ppLibrary = new VulkanLibrary1(this, pData, Size);
+  return Result::Ok;
+}
+
+VulkanRenderPass::VulkanRenderPass(VulkanDevice * pDevice, const RenderPassDesc * pDesc)
+  : Device(pDevice)
+{
+  Device->AddInternalRef();
+  
+  VkRenderPassCreateInfo Info = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+
+  std::vector<VkAttachmentReference> colorRefers;
+  std::vector<VkAttachmentDescription> attachments;
+
+  Info.attachmentCount = pDesc->colorAttachmentsCount + pDesc->pDepthStencilAttachment ? 1 : 0;
+  attachments.resize(Info.attachmentCount);
+  memset(attachments.data(), 0, Info.attachmentCount * sizeof(VkAttachmentDescription));
+
+  uint32 colorId = 0;
+
+  for (int i = 0; i < pDesc->colorAttachmentsCount; i++)
+  {
+    TextureDesc texDesc;
+    pDesc->pColorAttachments[i].texture->GetDesc(&texDesc);
+    attachments[i].format = ConvertPixelFormatToVulkanEnum(texDesc.format);
+    attachments[i].loadOp = ConvertLoadActionToVulkanEnum(pDesc->pColorAttachments[i].loadAction);
+    attachments[i].storeOp = ConvertStoreActionToVulkanEnum(pDesc->pColorAttachments[i].storeAction);
+    attachments[i].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[i].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorRefers.push_back({ colorId, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+    colorId++;
+  }
+
+  // Create default subpass
+  VkSubpassDescription defaultSubpass = {
+    0,                                //VkSubpassDescriptionFlags       flags;
+    VK_PIPELINE_BIND_POINT_GRAPHICS,  //VkPipelineBindPoint             pipelineBindPoint;
+    0,                                //uint32_t                        inputAttachmentCount;
+    nullptr,                          //const VkAttachmentReference*    pInputAttachments;
+    colorRefers.size(),               //uint32_t                        colorAttachmentCount;
+    colorRefers.data(),               //const VkAttachmentReference*    pColorAttachments;
+    nullptr,                          //const VkAttachmentReference*    pResolveAttachments;
+                                      //const VkAttachmentReference*    pDepthStencilAttachment;
+                                      //uint32_t                        preserveAttachmentCount;
+                                      //const uint32_t*                 pPreserveAttachments;
+  };
+
+  VkAttachmentReference depthStencilRefer = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+  if (pDesc->pDepthStencilAttachment)
+  {
+    TextureDesc texDesc;
+    pDesc->pDepthStencilAttachment->texture->GetDesc(&texDesc);
+    attachments[pDesc->colorAttachmentsCount].format = ConvertPixelFormatToVulkanEnum(texDesc.format);
+    attachments[pDesc->colorAttachmentsCount].stencilLoadOp = ConvertLoadActionToVulkanEnum(pDesc->pDepthStencilAttachment->loadAction);
+    attachments[pDesc->colorAttachmentsCount].stencilStoreOp = ConvertStoreActionToVulkanEnum(pDesc->pDepthStencilAttachment->storeAction);
+    attachments[pDesc->colorAttachmentsCount].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[pDesc->colorAttachmentsCount].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    defaultSubpass.pDepthStencilAttachment = &depthStencilRefer;
+  }
+
+  Info.pAttachments = attachments.data();
+  Info.subpassCount = 1;
+  Info.pSubpasses = &defaultSubpass;
+
+  VkSubpassDependency dependency = { 0 };
+  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependency.dstSubpass = 0;
+  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  dependency.srcAccessMask = 0;
+  dependency.dstAccessMask = 0;
+  Info.dependencyCount = 1;
+  Info.pDependencies = &dependency;
+
+  CHECK(vkCreateRenderPass(Device->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
+}
+
+VulkanRenderPass::~VulkanRenderPass()
+{
+  vkDestroyRenderPass(Device->Handle, Handle, VULKAN_ALLOCATOR);
+  Device->ReleaseInternal();
+}
+
 Result VulkanDevice::CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass)
 {
+  *ppRenderpass = new VulkanRenderPass(this, desc);
   return Result::Ok;
 }
 
@@ -1313,10 +1840,15 @@ Result VulkanSampler::GetDesc(SamplerDesc * desc)
 VulkanComputePipeline::VulkanComputePipeline(VulkanDevice * pDevice, Function * pComputeFunc, PipelineLayout * pLayout)
   : Super(pDevice)
 {
-  VkComputePipelineCreateInfo Info = 
-  {
-    VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, nullptr, 0
-  };
+  Info = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, nullptr, 0 };
+  
+  VulkanPipelineLayout* layout = static_cast<VulkanPipelineLayout*>(pLayout);
+  Info.layout = layout->Handle;
+
+  VulkanFunction1* computeFunction = static_cast<VulkanFunction1*>(pComputeFunc);
+  Info.stage = computeFunction->StageInfo;
+  CHECK(CreatePipelineCache(nullptr, 0));
+  CHECK(CreatePipeline());
 }
 
 VulkanComputePipeline::~VulkanComputePipeline()
@@ -1324,28 +1856,41 @@ VulkanComputePipeline::~VulkanComputePipeline()
 }
 
 VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderPipelineDesc * pDesc, RenderPass * pRenderPass, PipelineLayout * pLayout)
-  : Super(pDevice)
+  : VulkanRenderPipeline::Super(pDevice)
 {
-  VkGraphicsPipelineCreateInfo Info =
-  {
-    VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, nullptr, 0
-  };
-  uint32_t stageCount = 0;
+  Info = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+
+  InitShaderStages(pDesc);
+
+  Info.stageCount = Stages.size();
+  Info.pStages = Stages.data();
+
+  Info.pRasterizationState = &RasterizationState;
+  Info.pDepthStencilState = &DepthStencilState;
+  Info.pColorBlendState = &BlendState;
+  Info.pDynamicState = &DynamicState;
+  Info.pInputAssemblyState = &InputAssemblyState;
+  Info.pVertexInputState = &VertexInputState;
+  Info.pMultisampleState = &MultisampleState;
+  Info.pViewportState = &ViewportState;
+  Info.pTessellationState = &TessellationState;
+
+  CHECK(CreatePipelineCache(nullptr, 0));
+  CHECK(CreatePipeline());
+}
+
+void VulkanRenderPipeline::InitShaderStages(const RenderPipelineDesc* pDesc)
+{
   if (pDesc->vertexFunction)
   {
-    auto vertShader = static_cast<VulkanFunction*>(pDesc->vertexFunction);
-    vkCreateShaderModule(OwningDevice->Handle, &vertShader->ShaderModuleInfo, VULKAN_ALLOCATOR, &vertShader->ShaderModule);
-    stageCount++;
+    auto vertShader = static_cast<VulkanFunction1*>(pDesc->vertexFunction);
+    Stages.push_back(vertShader->StageInfo);
   }
   if (pDesc->pixelFunction)
   {
-    stageCount++;
+    auto pixelShader = static_cast<VulkanFunction1*>(pDesc->pixelFunction);
+    Stages.push_back(pixelShader->StageInfo);
   }
-  Info.stageCount = stageCount;
-  VkPipelineShaderStageCreateInfo* pStageInfos = 
-    (VkPipelineShaderStageCreateInfo*)calloc(stageCount, sizeof(VkPipelineShaderStageCreateInfo));
-  //pStageInfos[0] = vertShader->GetPipelineStageInfo();
-  Info.pStages = pStageInfos;
 }
 
 VulkanRenderPipeline::~VulkanRenderPipeline()
@@ -1357,7 +1902,6 @@ Result VulkanRenderPipeline::GetDesc(RenderPipelineDesc * pDesc)
   return Result::Ok;
 }
 
-
 template<class T>
 TPipeline<T>::TPipeline(VulkanDevice * pDevice)
   : OwningDevice(pDevice)
@@ -1368,12 +1912,67 @@ TPipeline<T>::TPipeline(VulkanDevice * pDevice)
 template<class T>
 TPipeline<T>::~TPipeline()
 {
-  if(Handle)
+  if (Handle)
   {
     vkDestroyPipeline(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
   }
+  if (Cache)
+  {
+    vkDestroyPipelineCache(OwningDevice->Handle, Cache, VULKAN_ALLOCATOR);
+  }
   OwningDevice->ReleaseInternal();
 }
+
+VulkanPipelineLibrary::VulkanPipelineLibrary(VulkanDevice * pDevice, const void * InData, uint64_t Size)
+  : Device(pDevice), Handle(VK_NULL_HANDLE)
+{
+  Device->AddInternalRef();
+  VkPipelineCacheCreateInfo Info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, Size, InData };
+  CHECK(vkCreatePipelineCache(Device->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
+}
+
+VulkanPipelineLibrary::~VulkanPipelineLibrary()
+{
+  vkDestroyPipelineCache(Device->Handle, Handle, VULKAN_ALLOCATOR);
+  Device->ReleaseInternal();
+}
+
+void VulkanPipelineLibrary::StorePipeline(const char * key, Pipeline * pPipeline)
+{
+  if (pPipeline)
+  {
+    switch (pPipeline->Type())
+    {
+    case PipelineType::Graphics:
+    {
+      auto Gfx = static_cast<VulkanRenderPipeline*>(pPipeline);
+      if (Gfx->Cache)
+        CHECK(vkMergePipelineCaches(Device->Handle, Handle, 1, &Gfx->Cache));
+      break;
+    }
+    case PipelineType::Compute:
+    {
+      auto Cpt = static_cast<VulkanComputePipeline*>(pPipeline);
+      if (Cpt->Cache)
+        CHECK(vkMergePipelineCaches(Device->Handle, Handle, 1, &Cpt->Cache));
+      break;
+    }
+    }
+  }
+}
+
+uint64_t VulkanPipelineLibrary::GetSerializedSize() const
+{
+  uint64_t Size = 0;
+  CHECK(vkGetPipelineCacheData(Device->Handle, Handle, &Size, nullptr));
+  return Size;
+}
+
+void VulkanPipelineLibrary::Serialize(void * pData, uint64_t Size)
+{
+  CHECK(vkGetPipelineCacheData(Device->Handle, Handle, &Size, pData));
+}
+
 
 VulkanShaderLayout::VulkanShaderLayout(VulkanDevice * pDevice, const ShaderLayoutDesc* pDesc)
   : OwningDevice(pDevice)
@@ -1385,6 +1984,7 @@ VulkanShaderLayout::VulkanShaderLayout(VulkanDevice * pDevice, const ShaderLayou
     (VkDescriptorSetLayoutBinding*)calloc(pDesc->count, sizeof(VkDescriptorSetLayoutBinding));
   for(uint32_t i; i < pDesc->count; i++)
   {
+//    pSetBindings[i].stageFlags = pDesc->pShaderBindings[i].visibility;
     pSetBindings[i].binding = pDesc->pShaderBindings[i].slot;
   }
   Info.pBindings = pSetBindings;
@@ -1400,11 +2000,21 @@ VulkanShaderLayout::~VulkanShaderLayout()
   OwningDevice->ReleaseInternal();
 }
 
-
-VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const PipelineLayoutDesc * pDesc)
-  : OwningDevice(pDevice)
+VulkanDescriptorLayout::VulkanDescriptorLayout(VulkanDevice * pDevice, VkDescriptorSetLayoutBinding * pBindings, int Count)
+  : Device(pDevice)
 {
-  OwningDevice->AddInternalRef();
+  Device->AddInternalRef();
+}
+
+VulkanDescriptorLayout::~VulkanDescriptorLayout()
+{
+  Device->ReleaseInternal();
+}
+
+VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const ngfx::PipelineLayoutDesc * pDesc)
+  : Device(pDevice)
+{
+  Device->AddInternalRef();
   assert(pDesc && pDesc->shaderLayoutCount);
   VkPipelineLayoutCreateInfo Info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
   Info.setLayoutCount = pDesc->shaderLayoutCount;
@@ -1414,16 +2024,16 @@ VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const Pipelin
     pLayouts[i] = static_cast<const VulkanShaderLayout*>(pDesc->pShaderLayout + i)->Handle;
   }
   Info.pSetLayouts = pLayouts;
-  vkCreatePipelineLayout(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
+  vkCreatePipelineLayout(Device->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
 }
 
 VulkanPipelineLayout::~VulkanPipelineLayout()
 {
   if(Handle)
   {
-    vkDestroyPipelineLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+    vkDestroyPipelineLayout(Device->Handle, Handle, VULKAN_ALLOCATOR);
   }
-  OwningDevice->ReleaseInternal();
+  Device->ReleaseInternal();
 }
 
 Result VulkanPipelineLayout::CreateBindingTable(BindingTable ** ppBindingTable)
@@ -1452,6 +2062,29 @@ void VulkanBindingTable::SetBuffer(uint32_t index, ShaderType shaderVis, BufferV
 
 void VulkanBindingTable::SetTexture(uint32_t index, ShaderType shaderVis, TextureView * textureView)
 {
+}
+
+VulkanDescriptorPool::VulkanDescriptorPool(VulkanDevice * pDevice, uint64_t MaxSet)
+  : Device(pDevice)
+{
+  Device->AddInternalRef();
+  struct DescriptorPoolSize 
+  {
+    VkDescriptorType    type;
+    uint32_t            descriptorCount;
+  };
+  VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+  createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  createInfo.maxSets = 1;
+  createInfo.poolSizeCount = 0;
+  createInfo.pPoolSizes = nullptr;
+  CHECK(vkCreateDescriptorPool(Device->Handle, &createInfo, NULL, &Handle));
+}
+
+VulkanDescriptorPool::~VulkanDescriptorPool()
+{
+  vkDestroyDescriptorPool(Device->Handle, Handle, VULKAN_ALLOCATOR);
+  Device->ReleaseInternal();
 }
 
 VulkanFence::VulkanFence(VulkanDevice * pDevice)
@@ -1498,8 +2131,9 @@ void VulkanCommandBuffer::Commit(Fence * pFence)
 }
 
 template<class T>
-TCmdEncoder<T>::TCmdEncoder(VulkanCommandBuffer* pCmd)
+TCmdEncoder<T>::TCmdEncoder(VulkanCommandBuffer* pCmd, VkPipelineBindPoint Point)
   : OwningCommand(pCmd)
+  , CurrentBindingPoint(Point)
 {
 }
 
@@ -1516,16 +2150,33 @@ void TCmdEncoder<T>::Barrier(Resource * pResource)
 template<class T>
 void TCmdEncoder<T>::SetPipeline(Pipeline * pPipelineState)
 {
-}
-
-template<class T>
-void TCmdEncoder<T>::SetPipelineLayout(PipelineLayout * pPipelineLayout)
-{
+  if (pPipelineState)
+  {
+    switch (pPipelineState->Type())
+    {
+    case PipelineType::Compute:
+    {
+      VulkanComputePipeline* pipeline = static_cast<VulkanComputePipeline*>(pPipelineState);
+      vkCmdBindPipeline(OwningCommand->Handle, CurrentBindingPoint, pipeline->Handle);
+      break;
+    }
+    case PipelineType::Graphics:
+    {
+      VulkanRenderPipeline* pipeline = static_cast<VulkanRenderPipeline*>(pPipelineState);
+      vkCmdBindPipeline(OwningCommand->Handle, CurrentBindingPoint, pipeline->Handle);
+      break;
+    }
+    }
+  }
 }
 
 template<class T>
 void TCmdEncoder<T>::SetBindingTable(BindingTable * pBindingTable)
 {
+  VulkanBindingTable* bindingTable = static_cast<VulkanBindingTable*>(pBindingTable);
+  VkDescriptorSet sets[] = { bindingTable->Handle };
+  vkCmdBindDescriptorSets(OwningCommand->Handle, CurrentBindingPoint,
+    bindingTable->OwningLayout->Handle, 0, 1, sets, 0, nullptr);
 }
 
 template<class T>
@@ -1554,16 +2205,40 @@ void VulkanRenderEncoder::SetViewport(const Viewport * pViewport)
   vkCmdSetViewport(OwningCommand->Handle, 0, 1, &viewPort);
 }
 
+void VulkanRenderEncoder::SetDepthBias(Float32 biasConst, Float32 biasClamp, Float32 biasSlope)
+{
+  vkCmdSetDepthBias(OwningCommand->Handle, biasConst, biasClamp, biasSlope);
+}
+
+void VulkanRenderEncoder::SetDepthBounds(Float32 minDepth, Float32 maxDepth)
+{
+  vkCmdSetDepthBounds(OwningCommand->Handle, minDepth, maxDepth);
+}
+
+void VulkanRenderEncoder::SetStencilReference(StencilFaceRef face, uint32_t value)
+{
+  vkCmdSetStencilReference(OwningCommand->Handle, (VkStencilFaceFlags)face, value);
+}
+
+void VulkanRenderEncoder::SetBlendConsts(Float32x4 constant)
+{
+//  vkCmdSetBlendConstants((const float[4])(&constant));
+}
+
+void VulkanRenderEncoder::SetLineWidth(Float32 width)
+{
+  vkCmdSetLineWidth(OwningCommand->Handle, width);
+}
+
 void VulkanRenderEncoder::SetIndexBuffer(Buffer * pIndexBuffer)
 {
+  VulkanBuffer* pBuffer = static_cast<VulkanBuffer*>(pIndexBuffer);
+  vkCmdBindIndexBuffer(OwningCommand->Handle, pBuffer->GetHandle(), 0, VkIndexType::VK_INDEX_TYPE_UINT32);
 }
 
 void VulkanRenderEncoder::SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer)
 {
-}
-
-void VulkanRenderEncoder::SetPrimitiveType(PrimitiveType primitive)
-{
+//  vkCmdBindVertexBuffers()
 }
 
 void VulkanRenderEncoder::DrawInstanced(const DrawInstancedDesc * drawParam)
@@ -1612,4 +2287,104 @@ VulkanComputeEncoder::~VulkanComputeEncoder()
 void VulkanComputeEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
   vkCmdDispatch(OwningCommand->Handle, x, y, z);
+}
+
+VulkanLibrary1::VulkanLibrary1(VulkanDevice * pDevice, const void * pBlobData, uint64 Size)
+  : Device(pDevice)
+{
+  Init(pBlobData, Size);
+}
+
+VulkanLibrary1::VulkanLibrary1(VulkanDevice * pDevice, const char * pFilePath)
+  : Device(pDevice)
+{
+  MemMapFile MemFile;
+  if (MemFile.Open(pFilePath, IORead))
+  {
+    Init(MemFile.FileData(), MemFile.GetSize());
+    MemFile.Close();
+  }
+}
+
+void VulkanLibrary1::Init(const void * pBlobData, uint64 Size)
+{
+  const char* pHead = reinterpret_cast<const char*>(pBlobData);
+  // parse binary
+  if (pHead[0] == 'V' && pHead[1] == 'K' && pHead[2] == 'B' && pHead[3] == 'C') // Binary Version
+  {
+    const uint32_t* pVersion = reinterpret_cast<const uint32_t*>(pHead + 4);
+    const uint32_t* pEntryCount = reinterpret_cast<const uint32_t*>(pHead + 8);
+    if (*pEntryCount > 0)
+    {
+      int curOffset = 12;
+      int szEntryInfos = *pEntryCount * sizeof(EntryInfo);
+      int spirvOffset = curOffset + szEntryInfos;
+      for (int i = 0; i < *pEntryCount; i++)
+      {
+        const EntryInfo* pInfo = reinterpret_cast<const EntryInfo*>(pHead + curOffset);
+        DataBlob[pInfo->Name].Stage = (ngfx::ShaderType)pInfo->ShaderType;
+        curOffset += sizeof(EntryInfo);
+        DataBlob[pInfo->Name].ByteCode.resize(pInfo->Size / sizeof(uint32_t));
+        memcpy(DataBlob[pInfo->Name].ByteCode.data(), pHead + spirvOffset + pInfo->OffSet, pInfo->Size);
+      }
+    }
+  }
+  else  // Source Text Version
+  {
+    std::string ErrorInfo;
+    CompileFromSource(CompileOption(), pHead, DataBlob, ErrorInfo);
+  }
+}
+
+VulkanLibrary1::~VulkanLibrary1()
+{
+}
+
+VulkanFunction1::VulkanFunction1(VulkanLibrary1 * pLibrary, const char * name)
+  : Library(pLibrary)
+  , StageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO }
+  , ShaderModule(VK_NULL_HANDLE)
+  , EntryName(name)
+{
+  Library->AddInternalRef();
+  VkShaderModuleCreateInfo CreateInfo = {
+    VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+  };
+  Library->DataBlob[name].ByteCode;
+  ShaderType = Library->DataBlob[name].Stage;
+  CreateInfo.codeSize = sizeof(uint32_t) * Library->DataBlob[name].ByteCode.size();
+  CreateInfo.pCode = Library->DataBlob[name].ByteCode.data();
+  CHECK(vkCreateShaderModule(Library->Device->Handle, &CreateInfo, VULKAN_ALLOCATOR, &ShaderModule));
+  StageInfo.module = ShaderModule;
+  StageInfo.stage = ConvertShaderTypeToVulkanEnum(Library->DataBlob[name].Stage);
+  StageInfo.pName = EntryName.c_str();
+}
+
+VulkanFunction1::~VulkanFunction1()
+{
+  if(ShaderModule)
+  {
+    vkDestroyShaderModule(Library->Device->Handle, ShaderModule, VULKAN_ALLOCATOR);
+  }
+  Library->ReleaseInternal();
+}
+
+ShaderType VulkanFunction1::Type() const
+{
+  return ShaderType::Compute;
+}
+
+const char * VulkanFunction1::Name() const
+{
+  return nullptr;
+}
+
+Result VulkanLibrary1::MakeFunction(const char * name, Function ** ppFunction)
+{
+  if (DataBlob.find(name) != DataBlob.end())
+  {
+    *ppFunction = new VulkanFunction1(this, name);
+    return Result::Ok;
+  }
+  return Result::Failed;
 }

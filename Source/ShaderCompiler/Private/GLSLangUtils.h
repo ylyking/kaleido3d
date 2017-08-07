@@ -1,6 +1,6 @@
 #pragma once
 #include <Interface/ICrossShaderCompiler.h>
-#include <glslang/GlslangToSpv.h>
+#include <SPIRV/GlslangToSpv.h>
 
 void sInitializeGlSlang();
 void sFinializeGlSlang();

@@ -7,6 +7,7 @@
 #include <maya/MBoundingBox.h>
 #include <maya/MPxFileTranslator.h>
 
+#include <maya/MPxCommand.h>
 #include <maya/MStatus.h>
 
 #include <maya/MString.h>
@@ -36,6 +37,13 @@
 #include <maya/MObjectArray.h>
 #include <maya/MObject.h>
 
+#include <maya/MPxNode.h>
+
+#include <maya/MFnTypedAttribute.h>
+#include <maya/MFnNumericAttribute.h>
+#include <maya/MFnCompoundAttribute.h>
+#include <maya/MFnNumericData.h>
+
 #include <maya/MFnDagNode.h>
 #include <maya/MItDag.h>
 
@@ -49,3 +57,9 @@
 
 #define MAYA_TRANSLATOR				"kaleido3d digital content package"
 #define MAYA_TRANSLATOR_EXT			"bundle"
+
+#define MS_CHECK(status, stat) \
+if (status != MStatus::kSuccess) \
+{\
+  status.perror(#stat); \
+}

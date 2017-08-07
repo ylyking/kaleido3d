@@ -1,12 +1,16 @@
 #include "vulkan_glslang.h"
 using namespace ngfx;
 
-#include <glslang/GlslangToSpv.h>
+#include <SPIRV/GlslangToSpv.h>
+#include <glslang/MachineIndependent/localintermediate.h>
 #include <spirv_cross/spirv_cross.hpp>
-//#include <spirv_cross/spirv_glsl.hpp>
 
 using namespace glslang;
 using namespace spirv_cross;
+
+#include <Kaleido3D.h>
+#include <Core/Os.h>
+#include <KTL/Archive.hpp>
 
 EShLanguage ConvertShaderTypeToGlslangEnum(ngfx::ShaderType const& e) {
   switch (e) {
@@ -22,6 +26,23 @@ EShLanguage ConvertShaderTypeToGlslangEnum(ngfx::ShaderType const& e) {
     return EShLangTessEvaluation;
   case ShaderType::TessailationControl:
     return EShLangTessControl;
+  }
+}
+
+ShaderType ConvertGlslangEnum(EShLanguage const& e) {
+  switch (e) {
+  case EShLangVertex:
+    return ShaderType::Vertex;
+  case EShLangFragment:
+    return ShaderType::Fragment;
+  case EShLangCompute:
+    return ShaderType::Compute;
+  case EShLangGeometry:
+    return ShaderType::Geometry;
+  case EShLangTessEvaluation:
+    return ShaderType::TessailationEval;
+  case EShLangTessControl:
+    return ShaderType::TessailationControl;
   }
 }
 
@@ -139,117 +160,6 @@ void initResources(TBuiltInResource &resources)
   resources.limits.generalConstantMatrixVectorIndexing = 1;
 }
 
-GlslangCompiler::GlslangCompiler()
-{
-  sInitializeGlSlang();
-}
-
-GlslangCompiler::~GlslangCompiler()
-{
-  sFinializeGlSlang();
-}
-
-ngfx::Result GlslangCompiler::Compile(const ngfx::ShaderOption * option, void * pData, uint32_t size, ngfx::Function ** output)
-{
-  if (option->format == ShaderFormat::Text)
-  {
-    EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
-    switch (option->language)
-    {
-    case ShaderLang::GLSL:
-      break;
-    case ShaderLang::HLSL:
-      messages =
-        (EShMessages)(EShMsgVulkanRules | EShMsgSpvRules | EShMsgReadHlsl);
-      break;
-    default:
-      break;
-    }
-    TProgram& program = *new TProgram;
-    TBuiltInResource Resources;
-    initResources(Resources);
-    const char* shaderStrings[1];
-    EShLanguage stage = ConvertShaderTypeToGlslangEnum(option->stage);
-    TShader* shader = new TShader(stage);
-
-    shaderStrings[0] = (const char*)pData;
-    shader->setStrings(shaderStrings, 1);
-    shader->setEntryPoint(option->entryName);
-
-    if (!shader->parse(&Resources, 100, false, messages))
-    {
-      puts(shader->getInfoLog());
-      puts(shader->getInfoDebugLog());
-      return Result::Failed;
-    }
-    program.addShader(shader);
-    if (!program.link(messages))
-    {
-      puts(program.getInfoLog());
-      puts(program.getInfoDebugLog());
-      return Result::Failed;
-    }
-
-    if (program.buildReflection())
-    {
-      auto function = new VulkanFunction();
-      function->EntryName = option->entryName;
-      GlslangToSpv(*program.getIntermediate(stage), function->ByteCodes);
-      function->ShaderModuleInfo.codeSize = function->ByteCodes.size() * sizeof(uint32_t);
-      function->ShaderModuleInfo.pCode = function->ByteCodes.data();
-      *output = function;
-    }
-    else
-    {
-      return Result::Failed;
-    }
-  }
-  else // byteCode reflection
-  {
-  }
-
-  return Result::Ok;
-}
-
-ngfx::Result GlslangCompiler::Reflect(void * pData, uint32_t size, ngfx::Reflection ** ppResult)
-{
-  *ppResult = new SPIRVCrossReflection(pData, size);
-  return Result::Ok;
-}
-
-VulkanFunction::VulkanFunction()
-{
-}
-
-VulkanFunction::~VulkanFunction()
-{
-  if (ShaderModule)
-  {
-    //vkDestroyShaderModule(VK_NULL_HANDLE, ShaderModule, nullptr);
-  }
-}
-
-ngfx::ShaderType VulkanFunction::Type()
-{
-  return ShaderType;
-}
-
-const char * VulkanFunction::Name()
-{
-  return EntryName.c_str();
-}
-
-VkPipelineShaderStageCreateInfo* 
-VulkanFunction::GetPipelineStageInfo()
-{
-  StageInfo.module = ShaderModule;
-  StageInfo.pName = EntryName.c_str();
-  StageInfo.flags;
-  StageInfo.stage;
-  //StageInfo.pSpecializationInfo;
-  return &StageInfo;
-}
-
 class SPIRVVariable : public ngfx::Variable
 {
 public:
@@ -322,13 +232,37 @@ SPIRVCrossReflection::SPIRVCrossReflection(void* pData, uint32_t size)
   : m_Reflector(nullptr)
 {
   m_Reflector = new spirv_cross::Compiler(reinterpret_cast<const uint32_t*>(pData), size/4);
+  DoReflect();
+}
 
-  for (auto& res : m_Reflector->get_shader_resources().storage_buffers) 
+SPIRVCrossReflection::SPIRVCrossReflection(const ByteCode & bc)
+{
+  m_Reflector = new spirv_cross::Compiler(bc);
+  DoReflect();
+}
+
+SPIRVCrossReflection::~SPIRVCrossReflection()
+{
+  if (m_Reflector)
   {
-    SPIRVVariable* var  = new SPIRVVariable;
-    var->name           = m_Reflector->get_name(res.id);
-    var->id             = m_Reflector->get_decoration(res.id, spv::DecorationBinding);
-    auto type           = m_Reflector->get_type(res.type_id);
+    delete m_Reflector;
+    m_Reflector = nullptr;
+  }
+}
+
+ngfx::ShaderType SPIRVCrossReflection::GetStage() const
+{
+  return ngfx::ShaderType();
+}
+
+void SPIRVCrossReflection::DoReflect()
+{
+  for (auto& res : m_Reflector->get_shader_resources().storage_buffers)
+  {
+    SPIRVVariable* var = new SPIRVVariable;
+    var->name = m_Reflector->get_name(res.id);
+    var->id = m_Reflector->get_decoration(res.id, spv::DecorationBinding);
+    auto type = m_Reflector->get_type(res.type_id);
     //uint32_t bindingSet = m_Reflector->get_decoration(res.id, spv::DecorationDescriptorSet);
     if (type.pointer)
     {
@@ -343,7 +277,7 @@ SPIRVCrossReflection::SPIRVCrossReflection(void* pData, uint32_t size)
       }
       var->type = pType;
     }
-    else 
+    else
     {
       SPIRVArrayType* aType = new SPIRVArrayType;
       var->active;
@@ -351,32 +285,16 @@ SPIRVCrossReflection::SPIRVCrossReflection(void* pData, uint32_t size)
     }
     m_Vars.push_back(var);
   }
-
-
 }
 
-SPIRVCrossReflection::~SPIRVCrossReflection()
-{
-  if (m_Reflector)
-  {
-    delete m_Reflector;
-    m_Reflector = nullptr;
-  }
-}
-
-ngfx::ShaderType SPIRVCrossReflection::GetStage()
-{
-  return ngfx::ShaderType();
-}
-
-uint32_t SPIRVCrossReflection::VariableCount()
+uint32_t SPIRVCrossReflection::VariableCount() const
 {
   return m_Vars.size();
 }
 
-ngfx::Variable** SPIRVCrossReflection::Variables()
+ngfx::Variable* SPIRVCrossReflection::VariableAt(uint32_t id) const
 {
-  return m_Vars.data();
+  return m_Vars[id];
 }
 
 ArgumentAccess SPIRVVariable::Access()
@@ -395,4 +313,122 @@ ArgumentAccess SPIRVVariable::Access()
     return static_cast<SPIRVTextureType*>(type)->access;
   }
   return ArgumentAccess::ReadOnly;
+}
+
+ngfx::Result CompileFromSource(const ngfx::CompileOption & Opt, const char * pSource, FunctionMap & FuncMap, 
+  std::string& ErrorInfo)
+{
+  ShInitialize();
+
+  EShMessages messages =
+      (EShMessages)(EShMsgVulkanRules | EShMsgSpvRules | EShMsgReadHlsl);
+  TBuiltInResource Resources;
+  initResources(Resources);
+  const char* shaderStrings[1];
+  TShader* shader = new TShader(EShLangVertex);
+
+  shaderStrings[0] = (const char*)pSource;
+  shader->setStrings(shaderStrings, 1);
+  shader->setEntryPoint("");
+
+  if (!shader->parse(&Resources, 100, false, messages))
+  {
+    ErrorInfo = shader->getInfoLog();
+    ErrorInfo += std::string("\n");
+    ErrorInfo += shader->getInfoDebugLog();
+    ShFinalize();
+    return Result::Failed;
+  }
+
+  for (int i = 0; i < shader->getNumDeclEntryPoints(); i++)
+  {
+    const char *name = shader->getDeclEntryName(i);
+    EShLanguage lang = shader->getDeclEntryStage(name);
+    FunctionData data;
+    data.Stage = ConvertGlslangEnum(lang);
+
+    TShader* tmpShader = new TShader(lang);
+    shaderStrings[0] = (const char*)pSource;
+    tmpShader->setStrings(shaderStrings, 1);
+    tmpShader->setEntryPoint(name);
+
+    if (!tmpShader->parse(&Resources, 100, false, messages))
+    {
+      ErrorInfo = tmpShader->getInfoLog();
+      ErrorInfo += std::string("\n");
+      ErrorInfo += tmpShader->getInfoDebugLog();
+
+      ShFinalize();
+      return Result::Failed;
+    }
+    TProgram& program = *new TProgram;
+    program.addShader(tmpShader);
+
+    if (!program.link(messages))
+    {
+      ErrorInfo += "\n";
+      ErrorInfo += program.getInfoLog();
+      ErrorInfo += "\n";
+      ErrorInfo += program.getInfoDebugLog();
+
+      ShFinalize();
+      return Result::Failed;
+    }
+    GlslangToSpv(*program.getIntermediate(lang), data.ByteCode);
+    FuncMap[name] = data;
+    delete tmpShader;
+  }
+
+  ShFinalize();
+  return Result::Ok;
+}
+
+ngfx::Result ReflectFromSPIRV(ByteCode const & bc, ngfx::Reflection ** ppResult)
+{
+  *ppResult = new SPIRVCrossReflection(bc);
+  return Result::Ok;
+}
+
+/*
+struct EntryInfo
+{
+  char      Name[128];
+  char      Entry[128];
+  uint32_t  ShaderType;
+  uint32_t  Size;
+  uint32_t  OffSet;
+};
+*/
+
+ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path)
+{
+  if (Data.empty()) return Result::Failed;
+  Os::File OutputLib(Path);
+  OutputLib.Open(IOWrite);
+  k3d::Archive ArchLib;
+  ArchLib.SetIODevice(&OutputLib);
+  ArchLib.ArrayIn("VKBC", 4);
+  ArchLib << (uint32_t)2017u;
+  ArchLib << (uint32_t)Data.size();
+  uint32_t Offset = 0;
+  for (auto pair : Data)
+  {
+    auto& fData = pair.second;
+    auto SzByteCode = fData.ByteCode.size() * sizeof(uint32_t);
+    EntryInfo Info;
+    memset(&Info, 0, sizeof(Info));
+    Info.OffSet = Offset;
+    Info.Size = SzByteCode; // BlobSize
+    Info.ShaderType = (uint32_t)pair.second.Stage;
+    strncpy(Info.Name, pair.first.c_str(), 127);
+    ArchLib << Info;
+    
+    Offset += Info.Size;
+  }
+
+  for (auto pair : Data)
+  {
+    ArchLib.ArrayIn(pair.second.ByteCode.data(), pair.second.ByteCode.size());
+  }
+  OutputLib.Close();
 }

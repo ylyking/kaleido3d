@@ -377,7 +377,7 @@ typedef struct   Float32x4 { Float32 x,y,z,w;
 
             self.__header__.write('  virtual {0} {1}('.format(ret, real_func_name))
             self.__header__.write(', '.join(param_list))
-            self.__header__.write(') = 0;\n')
+            self.__header__.write(') const = 0;\n' if 'const' in function else ') = 0;\n')
 
     def get_real_type_name(self, type_name, ns=None, is_cpp=False):
         r_type_name = type_name

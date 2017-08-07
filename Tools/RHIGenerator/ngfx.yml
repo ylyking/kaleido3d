@@ -78,6 +78,13 @@ protype:
             - F32C3
             - F32C4
 
+    - stencil face ref:
+        type: enum
+        enums:
+            - front
+            - back
+            - front and back
+
     - primitive type:
         type: enum
         vulkan: VkPrimitiveTopology
@@ -775,8 +782,22 @@ protype:
         functions:
           - type:
               return: shader type
+              const: true
           - name:
               return: const char *
+              const: true
+
+    - library:
+        type: interface
+        inherit: ref counted<false>
+        functions:
+           - make function:
+                params:
+                    - name: name
+                      type: const char *
+                    - name: ppFunction
+                      type: function **
+                return: result
 
     - shader option:
         type: struct
@@ -907,11 +928,31 @@ protype:
         functions:
             - variable count:
                 return: uint32_t
-            - variables:
-                return: variable **
+                const: true
+            - variable at:
+                params:
+                    - name: id
+                      type: uint32_t
+                return: variable *
+                const: true
             - get stage:
                 return: shader type
-            
+                const: true
+
+    - compile option:
+        type: struct
+        members:
+          - name: stripDebugSymbols
+            type: Bool32
+          - name: optimizeSize
+            type: Bool32
+          - name: language
+            type: shader lang
+          - name: profile
+            type: shader profile
+          - name: format
+            type: shader format
+
     - compiler:
         type: interface
         inherit: ref counted<false>
@@ -983,6 +1024,34 @@ protype:
         functions:
             - type:
                 return: pipeline type
+                const: true
+            - get cache:
+                params:
+                  - name: pSize
+                    type: uint64_t *
+                  - name: pOutData
+                    type: void *
+                return: result
+
+    - pipeline library:
+        type: interface
+        inherit: ref counted<false>
+        functions:
+            - store pipeline:
+                params:
+                    - name: key
+                      type: const char *
+                    - name: pPipeline
+                      type: pipeline *
+            - get serialized size:
+                return: uint64_t
+                const: true
+            - serialize:
+                params:
+                    - name: pData
+                      type: void *
+                    - name: Size
+                      type: uint64_t
 
     - compute pipeline:
         type: interface
@@ -1171,6 +1240,26 @@ protype:
                     - name: pPipeline
                       type: pipeline **
                 return: result
+            - create pipeline library:
+                params:
+                    - name: pData
+                      type: const void *
+                    - name: Size
+                      type: uint64_t
+                    - name: ppPipelineLibrary
+                      type: pipeline library **
+                return: result
+            - create library:
+                params:
+                    - name: compileOption
+                      type: const compile option *
+                    - name: pData
+                      type: const void *
+                    - name: Size
+                      type: uint64_t
+                    - name: ppLibrary
+                      type: library **
+                return: result
             - create render pass:
                 params:
                   - name: desc
@@ -1269,10 +1358,6 @@ protype:
                 params:
                   - name: pPipelineState
                     type: pipeline*
-            - set pipeline layout:
-                params:
-                  - name: pPipelineLayout
-                    type: pipeline layout *
             - set binding table:
                 params:
                   - name: pBindingTable
@@ -1319,6 +1404,34 @@ protype:
                 params:
                     - name: pViewport
                       type: const viewport *
+            - set depth bias:
+                params:
+                    - name: biasConst
+                      type: Float32
+                    - name: biasClamp
+                      type: Float32
+                    - name: biasSlope
+                      type: Float32
+            - set depth bounds:
+                params:
+                    - name: minDepth
+                      type: Float32
+                    - name: maxDepth
+                      type: Float32
+            - set stencil reference:
+                params:
+                    - name: face
+                      type: stencil face ref
+                    - name: value
+                      type: uint32_t
+            - set blend consts:
+                params:
+                    - name: constant
+                      type: Float32x4
+            - set line width:
+                params:
+                    - name: width
+                      type: Float32
             - set index buffer:
                 params:
                     - name: pIndexBuffer
@@ -1331,10 +1444,6 @@ protype:
                       type: uint64_t
                     - name: pVertexBuffer
                       type: buffer *
-            - set primitive type:
-                params:
-                    - name: primitive
-                      type: primitive type
             - draw instanced:
                 params:
                     - name: drawParam

@@ -1,5 +1,3 @@
-set(GLSLANG_LIBS glslang OGLCompiler OSDependent SPIRV)
-
 set(UT_LINK_LIBS Kaleido3D.Core Kaleido3D.Render)
 set(UT_DEP_PLUGIN "")
 
@@ -68,7 +66,7 @@ endfunction()
 if(ANDROID)
     list(APPEND UT_LINK_LIBS RHI_Vulkan ShaderCompiler)
 elseif(WIN32)
-    list(APPEND UT_LINK_LIBS RHI_Vulkan winmm comctl32 ${GLSLANG_LIBS})
+    list(APPEND UT_LINK_LIBS RHI_Vulkan winmm comctl32)
     if(BUILD_WITH_D3D12)
         list(UT_LINK_LIBS RHI_D3D12 ${DXSDK_LIBRARIES})
     endif()
