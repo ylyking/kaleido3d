@@ -132,19 +132,8 @@ public:
     device->CreateFence(fence.GetAddressOf());
     fence->SetName("DefaultFence");
 
-    factory->CreateCompiler(ngfx::ShaderLang::HLSL, compiler.GetAddressOf());
-
     Ptr<Function> vertexFunction, fragFunction, computeFunction;
-    /*
-    ShaderOption shaderOpt = { ShaderType::Vertex, ShaderLang::HLSL, "MainVS", ShaderProfile::SM5, ShaderFormat::Text };
-    compiler->Compile(&shaderOpt, HLSL, strlen(HLSL), vertexFunction.GetAddressOf());
-    shaderOpt.SetEntryName("MainPS").SetStage(ShaderType::Fragment);
-    compiler->Compile(&shaderOpt, HLSL, strlen(HLSL), fragFunction.GetAddressOf());
-    shaderOpt.SetEntryName("MainCS").SetStage(ShaderType::Compute);
-    compiler->Compile(&shaderOpt, HLSL, strlen(HLSL), computeFunction.GetAddressOf());
-    */
     uint64 BeginCompile = Os::GetTicks();
-    Ptr<Library> library, libraryBlob;
     device->CreateLibrary(nullptr, HLSL, strlen(HLSL), library.GetAddressOf());
     library->MakeFunction("MainCS", computeFunction.GetAddressOf());
     uint64 CompileCost = Os::GetTicks() - BeginCompile;
@@ -157,17 +146,15 @@ public:
     libraryBlob->MakeFunction("MainVS", vertexFunction.GetAddressOf());
     uint64 FromFileCost = Os::GetTicks() - BeginFile;
 
-    // Opt pass
-    ShaderBinding binding0 = { "UBO", ShaderStageBit::Vertex, BindingType::UniformBuffer, 0, 1 }; 
-    ShaderLayoutDesc shaderLdesc = {&binding0, 1};
-    Ptr<ShaderLayout> shaderLayout;
-    device->CreateShaderLayout(&shaderLdesc, shaderLayout.GetAddressOf());
+    device->CreateComputePipeline(
+      computeFunction.Get(), 
+      pipelineLayout.Get(), 
+      computePipeline.GetAddressOf());
     
-    Ptr<PipelineLayout> pipelineLayout;
-    PipelineLayoutDesc pipelineLayoutDesc = {shaderLayout.Get(),1};    
-    device->CreatePipelineLayout(&pipelineLayoutDesc, pipelineLayout.GetAddressOf());
-
-    device->CreateComputePipeline(computeFunction.Get(), pipelineLayout.Get(), computePipeline.GetAddressOf());
+    device->CreateComputePipeline(
+      computeFunction.Get(), 
+      computePipeline1.GetAddressOf(), 
+      computePipelineReflection.GetAddressOf());
 
     ColorAttachmentDesc color0;
     DepthStencilAttachmentDesc depthStencil;
@@ -182,27 +169,46 @@ public:
       renderPass.Get(), 
       renderPipeline.GetAddressOf());
 
+    device->CreateRenderPipeline(
+      &renderPipelineDesc,
+      renderPass.Get(),
+      renderPipeline1.GetAddressOf(),
+      renderPipelineReflection.GetAddressOf());
+
     device->CreatePipelineLibrary(nullptr, 0, pipelineLibrary.GetAddressOf());
     pipelineLibrary->StorePipeline("Render", renderPipeline.Get());
     pipelineLibrary->StorePipeline("Compute", computePipeline.Get());
-
-    Ptr<CommandBuffer> commandBuffer = Ptr<CommandBuffer>(queue->CommandBuffer());
-    /*
-    Ptr<Drawable> drawable = Ptr<Drawable>(swapChain->NextDrawable());
-
-    Ptr<RenderCommandEncoder> renderCommand = Ptr<RenderCommandEncoder>(commandBuffer->RenderCommandEncoder(drawable.Get(), renderPass.Get()));
-    //renderCommand->SetViewport();
-    renderCommand->EndEncode();
-    //commandBuffer->Present();
-    commandBuffer->Commit(fence.Get());
-    */
 
     return true;
   }
 
   void OnProcess(k3d::Message &)override
   {
+    auto drawable = swapChain->NextDrawable();
+    Ptr<CommandBuffer> command;
+    queue->CreateCommandBuffer(command.GetAddressOf());
+    Ptr<RenderCommandEncoder> renderEncoder;
+    command->CreateRenderCommandEncoder(drawable, renderPass.Get(), renderEncoder.GetAddressOf());
+    renderEncoder->SetPipeline(renderPipeline.Get());
+    renderEncoder->SetBindTable(nullptr);
+    renderEncoder->SetIndexBuffer(nullptr);
+    renderEncoder->SetVertexBuffer(0, 0, nullptr);
+    renderEncoder->DrawIndexedInstanced(nullptr);
+    renderEncoder->EndEncode();
 
+    /*
+    Ptr<Framebuffer> fbo;
+    FramebufferDesc fbD;
+    fbD.setSize(1024, 1024);
+    fbD.attach(0, colorTexture0);
+    fbD.attach(1, colorTexture1);
+    fbD.attach(2, colorTexture2);
+    fbD.attachDs(depthStencil);
+    device->CreateFramebuffer(&fbD, fbo.GetAddressOf());
+    command->CreateRenderCommandEncoder(fbo.Get(), renderPass.Get(), renderEncoder.GetAddressOf());
+    */
+    command->Commit(fence.Get());
+    //swapChain->Present()
   }
 
   Ptr<Factory>      factory;
@@ -212,12 +218,18 @@ public:
   Ptr<Buffer>       buffer;
   Ptr<Texture>      texture;
   Ptr<Fence>        fence;
-  Ptr<Compiler>     compiler;
-  
-  Ptr<PipelineLibrary>  pipelineLibrary;
-  Ptr<RenderPass>       renderPass;
-  Ptr<Pipeline>         renderPipeline;
-  Ptr<Pipeline>         computePipeline;
+  //Ptr<Compiler>     compiler;
+
+  Ptr<Library>            library, libraryBlob;
+  Ptr<PipelineLibrary>    pipelineLibrary;
+  Ptr<RenderPass>         renderPass;
+  Ptr<PipelineLayout>     pipelineLayout;
+  Ptr<Pipeline>           renderPipeline;
+  Ptr<Pipeline>           renderPipeline1;
+  Ptr<PipelineReflection> renderPipelineReflection;
+  Ptr<Pipeline>           computePipeline;
+  Ptr<Pipeline>           computePipeline1;
+  Ptr<PipelineReflection> computePipelineReflection;
 };
 
 int main()

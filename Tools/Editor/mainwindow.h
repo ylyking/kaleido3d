@@ -19,6 +19,9 @@ public slots:
   void onExit();
 
 private:
+  void createActions();
+  void createDocks();
+
 };
 
 #endif // MAINWINDOW_H

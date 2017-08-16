@@ -18,7 +18,7 @@ namespace spirv_cross
   class Compiler;
 }
 
-class V_API SPIRVCrossReflection : public ngfx::Reflection
+class V_API SPIRVCrossReflection : public ngfx::PipelineReflection
 {
 public:
   SPIRVCrossReflection(void* pData, uint32_t size);
@@ -56,7 +56,7 @@ extern V_API
 ngfx::Result CompileFromSource(const ngfx::CompileOption& Opt, const char* pSource, FunctionMap& FuncMap, std::string& ErrorInfo);
 
 extern V_API
-ngfx::Result ReflectFromSPIRV(ByteCode const&bc, ngfx::Reflection ** ppResult);
+ngfx::Result ReflectFromSPIRV(ByteCode const&bc, ngfx::PipelineReflection ** ppResult);
 
 extern V_API
 ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path);

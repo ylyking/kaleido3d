@@ -24,6 +24,7 @@ SOFTWARE.
 #ifndef __NGFX__
 #define __NGFX__
 #include <stdint.h>
+#include <string.h>
 
 #if _WIN32
   #if defined(LIB_BUILD)
@@ -178,7 +179,7 @@ typedef enum ngfxResourceState
   NGFX_RESOURCE_STATE_COMMON = 1,
   NGFX_RESOURCE_STATE_VERTEX_BUFFER = 2,
   NGFX_RESOURCE_STATE_CONSTANT_BUFFER = 4,
-  NGFX_RESOURCE_STATE_RENDER_TARGET = 8,
+  NGFX_RESOURCE_STATE_FRAME_BUFFER = 8,
   NGFX_RESOURCE_STATE_PIXEL_SHADER_RESOURCE = 16,
   NGFX_RESOURCE_STATE_TRANSFER_SOURCE = 32,
   NGFX_RESOURCE_STATE_TRANSFER_DEST = 64,
@@ -201,6 +202,8 @@ typedef enum ngfxBufferViewBit
   NGFX_BUFFER_VIEW_BIT_SHADER_RESOURCE = 2,
   NGFX_BUFFER_VIEW_BIT_CONSTANT_BUFFER = 4,
   NGFX_BUFFER_VIEW_BIT_VERTEX_BUFFER = 8,
+  NGFX_BUFFER_VIEW_BIT_INDEX_BUFFER = 16,
+  NGFX_BUFFER_VIEW_BIT_INDIRECT_BUFFER = 32,
 } ngfxBufferViewBit;
 
 typedef enum ngfxTextureViewBit
@@ -218,6 +221,7 @@ typedef enum ngfxStorageOption
   NGFX_STORAGE_OPTION_MANAGED,
 } ngfxStorageOption;
 
+// Dimension Of Texture
 typedef enum ngfxTextureDimension
 {
   NGFX_TEXTURE_DIMENSION_TEX1D,
@@ -241,6 +245,16 @@ typedef enum ngfxCullMode
   NGFX_CULL_MODE_FRONT,
   NGFX_CULL_MODE_BACK,
 } ngfxCullMode;
+
+typedef enum ngfxLogicOperation
+{
+  NGFX_LOGIC_OPERATION_CLEAR,
+  NGFX_LOGIC_OPERATION_AND,
+  NGFX_LOGIC_OPERATION_XOR,
+  NGFX_LOGIC_OPERATION_OR,
+  NGFX_LOGIC_OPERATION_NOR,
+  NGFX_LOGIC_OPERATION_INVERT,
+} ngfxLogicOperation;
 
 typedef enum ngfxFilterMode
 {
@@ -399,7 +413,8 @@ typedef enum ngfxArgumentAccess
   NGFX_ARGUMENT_ACCESS_WRITE_ONLY = 2,
 } ngfxArgumentAccess;
 
-typedef struct _ngfxShaderLayout* ngfxShaderLayout;
+typedef struct _ngfxBindTableLayoutInitializer* ngfxBindTableLayoutInitializer;
+typedef struct _ngfxBindTableLayout* ngfxBindTableLayout;
 typedef struct _ngfxSwapChain* ngfxSwapChain;
 typedef struct _ngfxFunction* ngfxFunction;
 typedef struct _ngfxLibrary* ngfxLibrary;
@@ -409,17 +424,16 @@ typedef struct _ngfxStructType* ngfxStructType;
 typedef struct _ngfxArrayType* ngfxArrayType;
 typedef struct _ngfxPointerType* ngfxPointerType;
 typedef struct _ngfxTextureReferType* ngfxTextureReferType;
-typedef struct _ngfxReflection* ngfxReflection;
-typedef struct _ngfxCompiler* ngfxCompiler;
+typedef struct _ngfxPipelineReflection* ngfxPipelineReflection;
 typedef struct _ngfxFactory* ngfxFactory;
-typedef struct _ngfxRenderTarget* ngfxRenderTarget;
+typedef struct _ngfxFrameBuffer* ngfxFrameBuffer;
 typedef struct _ngfxRenderPass* ngfxRenderPass;
 typedef struct _ngfxPipeline* ngfxPipeline;
 typedef struct _ngfxPipelineLibrary* ngfxPipelineLibrary;
 typedef struct _ngfxComputePipeline* ngfxComputePipeline;
 typedef struct _ngfxRenderPipeline* ngfxRenderPipeline;
 typedef struct _ngfxPipelineLayout* ngfxPipelineLayout;
-typedef struct _ngfxBindingTable* ngfxBindingTable;
+typedef struct _ngfxBindTable* ngfxBindTable;
 typedef struct _ngfxSampler* ngfxSampler;
 typedef struct _ngfxResource* ngfxResource;
 typedef struct _ngfxBuffer* ngfxBuffer;
@@ -429,7 +443,6 @@ typedef struct _ngfxTextureView* ngfxTextureView;
 typedef struct _ngfxDrawable* ngfxDrawable;
 typedef struct _ngfxDevice* ngfxDevice;
 typedef struct _ngfxFence* ngfxFence;
-typedef struct _ngfxFrameBuffer* ngfxFrameBuffer;
 typedef struct _ngfxCommandQueue* ngfxCommandQueue;
 typedef struct _ngfxCommandBuffer* ngfxCommandBuffer;
 typedef struct _ngfxCommandEncoder* ngfxCommandEncoder;
@@ -451,11 +464,16 @@ struct ngfxRasterizerState
   ngfxFillMode fillMode;
   ngfxCullMode cullMode;
   Bool32 frontCCW;
+  Bool32 depthClipEnable;
+  Float32 depthBiasClamp;
+  Float32 depthBiasSlope;
   int32_t depthBias;
   Bool32 multiSampleEnable;
+  uint32_t sampleCount;
+  Bool32 alphaToCoverageEnable;
 };
 
-struct ngfxBlendState
+struct ngfxRtBlendState
 {
   Bool32 enable;
   ngfxBlendType srcColorBlend;
@@ -465,6 +483,14 @@ struct ngfxBlendState
   ngfxBlendType destAlphaBlend;
   ngfxBlendOperation alphaBlendOp;
   uint32_t colorWriteMask;
+};
+
+struct ngfxBlendState
+{
+  Bool32 alphaToCoverageEnable;
+  ngfxRtBlendState renderTargets[8];
+  Bool32 logicOpEnable;
+  ngfxLogicOperation logicOp;
 };
 
 struct ngfxDepthStencilState
@@ -508,6 +534,7 @@ struct ngfxBufferDesc
   ngfxBufferViewBit allowedViewBits;
   ngfxStorageOption option;
   uint64_t size;
+  uint64_t deviceMask;
 };
 
 // Description of the buffer usage
@@ -532,6 +559,7 @@ struct ngfxTextureDesc
   uint32_t depth;
   uint32_t layers;
   uint32_t mipLevels;
+  uint64_t deviceMask;
 };
 
 // Description about how the texture be used
@@ -572,9 +600,13 @@ struct ngfxRenderPipelineDesc
   ngfxBlendState blendState;
   ngfxDepthStencilState depthStencil;
   ngfxVertexInputState inputState;
+  uint32_t numRenderTargets;
+  ngfxPixelFormat renderTargetFormats[8];
+  ngfxPixelFormat depthStencilFormat;
   ngfxPrimitiveType primitiveTopology;
   ngfxFunction * vertexFunction;
   ngfxFunction * pixelFunction;
+  uint64_t deviceMask;
 };
 
 struct ngfxShaderBinding
@@ -586,16 +618,10 @@ struct ngfxShaderBinding
   uint32_t count;
 };
 
-struct ngfxShaderLayoutDesc
-{
-  const ngfxShaderBinding * pShaderBindings;
-  uint32_t count;
-};
-
 // Description of Pipeline Layout (How to layout bindings)
 struct ngfxPipelineLayoutDesc
 {
-  const ngfxShaderLayout * pShaderLayout;
+  const ngfxBindTableLayout * pShaderLayout;
   uint32_t shaderLayoutCount;
 };
 
@@ -631,10 +657,12 @@ struct ngfxRenderPassDesc
   ngfxDepthStencilAttachmentDesc * pDepthStencilAttachment;
 };
 
-// Description of Render Target
-struct ngfxRenderTargetDesc
+// Description of frame buffer
+struct ngfxFrameBufferDesc
 {
-  int32_t XX;
+  ngfxTexture * colorAttachments[8];
+  ngfxTexture * depthStencilAttachment;
+  uint32_t layers;
 };
 
 struct ngfxDrawIndexedInstancedDesc
@@ -837,6 +865,38 @@ private:
   NGFXObj* m_Ptr;
 };
 
+template <typename TEnum>
+class EnumAsUint32
+{
+public:
+  static_assert(__is_enum(TEnum), "TEnum is enum!");
+  EnumAsUint32(uint32_t Val = 0) : Value(Val) {}
+  EnumAsUint32(TEnum eVal) : Value(static_cast<uint32_t>(eVal)) {}
+  void operator |= (const TEnum& rhs)
+  {
+    Value |= static_cast<uint32_t>(rhs);
+  }
+  void operator &= (const TEnum& rhs)
+  {
+    Value &= static_cast<uint32_t>(rhs);
+  }
+  void operator ^= (const TEnum& rhs)
+  {
+    Value ^= static_cast<uint32_t>(rhs);
+  }
+  EnumAsUint32<TEnum> operator ~()
+  {
+    return EnumAsUint32<TEnum>(~Value);
+  }
+  uint32_t Value;
+};
+
+template <typename TEnum>
+inline bool operator & (const EnumAsUint32<TEnum>& Lhs, const TEnum& Rhs)
+{
+  return Lhs.Value & static_cast<uint32_t>(Rhs);
+}
+
 // Result of every call
 enum class Result : uint32_t
 {
@@ -959,7 +1019,7 @@ enum class ResourceState : uint32_t
   Common = 1,
   VertexBuffer = 2,
   ConstantBuffer = 4,
-  RenderTarget = 8,
+  FrameBuffer = 8,
   PixelShaderResource = 16,
   TransferSource = 32,
   TransferDest = 64,
@@ -982,6 +1042,8 @@ enum class BufferViewBit : uint32_t
   ShaderResource = 2,
   ConstantBuffer = 4,
   VertexBuffer = 8,
+  IndexBuffer = 16,
+  IndirectBuffer = 32,
 };// Enum BufferViewBit
 
 enum class TextureViewBit : uint32_t
@@ -999,6 +1061,7 @@ enum class StorageOption : uint32_t
   Managed,
 };// Enum StorageOption
 
+// Dimension Of Texture
 enum class TextureDimension : uint32_t
 {
   Tex1D,
@@ -1022,6 +1085,16 @@ enum class CullMode : uint32_t
   Front,
   Back,
 };// Enum CullMode
+
+enum class LogicOperation : uint32_t
+{
+  Clear,
+  And,
+  Xor,
+  Or,
+  Nor,
+  Invert,
+};// Enum LogicOperation
 
 enum class FilterMode : uint32_t
 {
@@ -1180,7 +1253,8 @@ enum class ArgumentAccess : uint32_t
   WriteOnly = 2,
 };// Enum ArgumentAccess
 
-struct ShaderLayout;
+struct BindTableLayoutInitializer;
+struct BindTableLayout;
 struct SwapChain;
 struct Function;
 struct Library;
@@ -1190,17 +1264,16 @@ struct StructType;
 struct ArrayType;
 struct PointerType;
 struct TextureReferType;
-struct Reflection;
-struct Compiler;
+struct PipelineReflection;
 struct Factory;
-struct RenderTarget;
+struct FrameBuffer;
 struct RenderPass;
 struct Pipeline;
 struct PipelineLibrary;
 struct ComputePipeline;
 struct RenderPipeline;
 struct PipelineLayout;
-struct BindingTable;
+struct BindTable;
 struct Sampler;
 struct Resource;
 struct Buffer;
@@ -1210,7 +1283,6 @@ struct TextureView;
 struct Drawable;
 struct Device;
 struct Fence;
-struct FrameBuffer;
 struct CommandQueue;
 struct CommandBuffer;
 struct CommandEncoder;
@@ -1231,7 +1303,7 @@ struct DepthStencilOp
   , depthStencilFailOp(_depthStencilFailOp)
   , stencilPassOp(_stencilPassOp)
   , stencilFunc(_stencilFunc)
-  {}
+  {  }
 
   DepthStencilOp& SetStencilFailOp(StencilOperation _stencilFailOp)
   {
@@ -1265,16 +1337,26 @@ struct RasterizerState
   FillMode fillMode;
   CullMode cullMode;
   Bool32 frontCCW;
+  Bool32 depthClipEnable;
+  Float32 depthBiasClamp;
+  Float32 depthBiasSlope;
   int32_t depthBias;
   Bool32 multiSampleEnable;
+  uint32_t sampleCount;
+  Bool32 alphaToCoverageEnable;
 
-  RasterizerState(FillMode _fillMode = FillMode::Wire, CullMode _cullMode = CullMode::None, Bool32 _frontCCW = 0, int32_t _depthBias = 0, Bool32 _multiSampleEnable = 0)
+  RasterizerState(FillMode _fillMode = FillMode::Wire, CullMode _cullMode = CullMode::None, Bool32 _frontCCW = 0, Bool32 _depthClipEnable = 0, Float32 _depthBiasClamp = 0, Float32 _depthBiasSlope = 0, int32_t _depthBias = 0, Bool32 _multiSampleEnable = 0, uint32_t _sampleCount = 0, Bool32 _alphaToCoverageEnable = 0)
   : fillMode(_fillMode)
   , cullMode(_cullMode)
   , frontCCW(_frontCCW)
+  , depthClipEnable(_depthClipEnable)
+  , depthBiasClamp(_depthBiasClamp)
+  , depthBiasSlope(_depthBiasSlope)
   , depthBias(_depthBias)
   , multiSampleEnable(_multiSampleEnable)
-  {}
+  , sampleCount(_sampleCount)
+  , alphaToCoverageEnable(_alphaToCoverageEnable)
+  {  }
 
   RasterizerState& SetFillMode(FillMode _fillMode)
   {
@@ -1294,6 +1376,24 @@ struct RasterizerState
     return *this;
   }
 
+  RasterizerState& SetDepthClipEnable(Bool32 _depthClipEnable)
+  {
+    depthClipEnable = _depthClipEnable;
+    return *this;
+  }
+
+  RasterizerState& SetDepthBiasClamp(Float32 _depthBiasClamp)
+  {
+    depthBiasClamp = _depthBiasClamp;
+    return *this;
+  }
+
+  RasterizerState& SetDepthBiasSlope(Float32 _depthBiasSlope)
+  {
+    depthBiasSlope = _depthBiasSlope;
+    return *this;
+  }
+
   RasterizerState& SetDepthBias(int32_t _depthBias)
   {
     depthBias = _depthBias;
@@ -1305,11 +1405,23 @@ struct RasterizerState
     multiSampleEnable = _multiSampleEnable;
     return *this;
   }
+
+  RasterizerState& SetSampleCount(uint32_t _sampleCount)
+  {
+    sampleCount = _sampleCount;
+    return *this;
+  }
+
+  RasterizerState& SetAlphaToCoverageEnable(Bool32 _alphaToCoverageEnable)
+  {
+    alphaToCoverageEnable = _alphaToCoverageEnable;
+    return *this;
+  }
 };
 
 static_assert(sizeof(RasterizerState) == sizeof(ngfxRasterizerState), "RasterizerState & ngfxRasterizerState Size Not Equal!");
 
-struct BlendState
+struct RtBlendState
 {
   Bool32 enable;
   BlendType srcColorBlend;
@@ -1320,7 +1432,7 @@ struct BlendState
   BlendOperation alphaBlendOp;
   uint32_t colorWriteMask;
 
-  BlendState(Bool32 _enable = 0, BlendType _srcColorBlend = BlendType::Zero, BlendType _destColorBlend = BlendType::Zero, BlendOperation _colorBlendOp = BlendOperation::Add, BlendType _srcAlphaBlend = BlendType::Zero, BlendType _destAlphaBlend = BlendType::Zero, BlendOperation _alphaBlendOp = BlendOperation::Add, uint32_t _colorWriteMask = 0)
+  RtBlendState(Bool32 _enable = 0, BlendType _srcColorBlend = BlendType::Zero, BlendType _destColorBlend = BlendType::Zero, BlendOperation _colorBlendOp = BlendOperation::Add, BlendType _srcAlphaBlend = BlendType::Zero, BlendType _destAlphaBlend = BlendType::Zero, BlendOperation _alphaBlendOp = BlendOperation::Add, uint32_t _colorWriteMask = 0)
   : enable(_enable)
   , srcColorBlend(_srcColorBlend)
   , destColorBlend(_destColorBlend)
@@ -1329,53 +1441,95 @@ struct BlendState
   , destAlphaBlend(_destAlphaBlend)
   , alphaBlendOp(_alphaBlendOp)
   , colorWriteMask(_colorWriteMask)
-  {}
+  {  }
 
-  BlendState& SetEnable(Bool32 _enable)
+  RtBlendState& SetEnable(Bool32 _enable)
   {
     enable = _enable;
     return *this;
   }
 
-  BlendState& SetSrcColorBlend(BlendType _srcColorBlend)
+  RtBlendState& SetSrcColorBlend(BlendType _srcColorBlend)
   {
     srcColorBlend = _srcColorBlend;
     return *this;
   }
 
-  BlendState& SetDestColorBlend(BlendType _destColorBlend)
+  RtBlendState& SetDestColorBlend(BlendType _destColorBlend)
   {
     destColorBlend = _destColorBlend;
     return *this;
   }
 
-  BlendState& SetColorBlendOp(BlendOperation _colorBlendOp)
+  RtBlendState& SetColorBlendOp(BlendOperation _colorBlendOp)
   {
     colorBlendOp = _colorBlendOp;
     return *this;
   }
 
-  BlendState& SetSrcAlphaBlend(BlendType _srcAlphaBlend)
+  RtBlendState& SetSrcAlphaBlend(BlendType _srcAlphaBlend)
   {
     srcAlphaBlend = _srcAlphaBlend;
     return *this;
   }
 
-  BlendState& SetDestAlphaBlend(BlendType _destAlphaBlend)
+  RtBlendState& SetDestAlphaBlend(BlendType _destAlphaBlend)
   {
     destAlphaBlend = _destAlphaBlend;
     return *this;
   }
 
-  BlendState& SetAlphaBlendOp(BlendOperation _alphaBlendOp)
+  RtBlendState& SetAlphaBlendOp(BlendOperation _alphaBlendOp)
   {
     alphaBlendOp = _alphaBlendOp;
     return *this;
   }
 
-  BlendState& SetColorWriteMask(uint32_t _colorWriteMask)
+  RtBlendState& SetColorWriteMask(uint32_t _colorWriteMask)
   {
     colorWriteMask = _colorWriteMask;
+    return *this;
+  }
+};
+
+static_assert(sizeof(RtBlendState) == sizeof(ngfxRtBlendState), "RtBlendState & ngfxRtBlendState Size Not Equal!");
+
+struct BlendState
+{
+  Bool32 alphaToCoverageEnable;
+  RtBlendState renderTargets[8];
+  Bool32 logicOpEnable;
+  LogicOperation logicOp;
+
+  BlendState(Bool32 _alphaToCoverageEnable = 0, Bool32 _logicOpEnable = 0, LogicOperation _logicOp = LogicOperation::Clear)
+  : alphaToCoverageEnable(_alphaToCoverageEnable)
+  , logicOpEnable(_logicOpEnable)
+  , logicOp(_logicOp)
+  {
+    memset(renderTargets, 0, sizeof(renderTargets));
+  }
+
+  BlendState& SetAlphaToCoverageEnable(Bool32 _alphaToCoverageEnable)
+  {
+    alphaToCoverageEnable = _alphaToCoverageEnable;
+    return *this;
+  }
+
+  BlendState& SetRenderTarget(int index, RtBlendState _renderTargets)
+  {
+    renderTargets[index] = _renderTargets;
+    return *this;
+  }
+
+  BlendState& SetLogicOpEnable(Bool32 _logicOpEnable)
+  {
+    logicOpEnable = _logicOpEnable;
+    return *this;
+  }
+
+  BlendState& SetLogicOp(LogicOperation _logicOp)
+  {
+    logicOp = _logicOp;
     return *this;
   }
 };
@@ -1398,7 +1552,7 @@ struct DepthStencilState
   , stencilEnable(_stencilEnable)
   , frontFace(_frontFace)
   , backFace(_backFace)
-  {}
+  {  }
 
   DepthStencilState& SetDepthEnable(Bool32 _depthEnable)
   {
@@ -1447,7 +1601,7 @@ struct DeviceDesc
   DeviceDesc(uint64_t _maxAllocation = 0, char * _vendorName = nullptr)
   : maxAllocation(_maxAllocation)
   , vendorName(_vendorName)
-  {}
+  {  }
 
   DeviceDesc& SetMaxAllocation(uint64_t _maxAllocation)
   {
@@ -1474,7 +1628,7 @@ struct Filter
   : minFilter(_minFilter)
   , magFilter(_magFilter)
   , mipMapFilter(_mipMapFilter)
-  {}
+  {  }
 
   Filter& SetMinFilter(FilterMode _minFilter)
   {
@@ -1518,7 +1672,7 @@ struct SamplerDesc
   , comparisonFunc(_comparisonFunc)
   , minLod(_minLod)
   , maxLod(_maxLod)
-  {}
+  {  }
 
   SamplerDesc& SetFilter(Filter _filter)
   {
@@ -1570,15 +1724,17 @@ static_assert(sizeof(SamplerDesc) == sizeof(ngfxSamplerDesc), "SamplerDesc & ngf
 // Description of a buffer
 struct BufferDesc
 {
-  BufferViewBit allowedViewBits;
+  EnumAsUint32<BufferViewBit> allowedViewBits;
   StorageOption option;
   uint64_t size;
+  uint64_t deviceMask;
 
-  BufferDesc(BufferViewBit _allowedViewBits = BufferViewBit::UnOrderedAccess, StorageOption _option = StorageOption::Shared, uint64_t _size = 0)
+  BufferDesc(BufferViewBit _allowedViewBits = BufferViewBit::UnOrderedAccess, StorageOption _option = StorageOption::Shared, uint64_t _size = 0, uint64_t _deviceMask = 0)
   : allowedViewBits(_allowedViewBits)
   , option(_option)
   , size(_size)
-  {}
+  , deviceMask(_deviceMask)
+  {  }
 
   BufferDesc& SetAllowedViewBits(BufferViewBit _allowedViewBits)
   {
@@ -1597,6 +1753,12 @@ struct BufferDesc
     size = _size;
     return *this;
   }
+
+  BufferDesc& SetDeviceMask(uint64_t _deviceMask)
+  {
+    deviceMask = _deviceMask;
+    return *this;
+  }
 };
 
 static_assert(sizeof(BufferDesc) == sizeof(ngfxBufferDesc), "BufferDesc & ngfxBufferDesc Size Not Equal!");
@@ -1605,7 +1767,7 @@ static_assert(sizeof(BufferDesc) == sizeof(ngfxBufferDesc), "BufferDesc & ngfxBu
 struct BufferViewDesc
 {
   ResourceViewType view;
-  ResourceState state;
+  EnumAsUint32<ResourceState> state;
   uint64_t size;
   uint64_t offset;
   uint64_t stride;
@@ -1616,7 +1778,7 @@ struct BufferViewDesc
   , size(_size)
   , offset(_offset)
   , stride(_stride)
-  {}
+  {  }
 
   BufferViewDesc& SetView(ResourceViewType _view)
   {
@@ -1654,7 +1816,7 @@ static_assert(sizeof(BufferViewDesc) == sizeof(ngfxBufferViewDesc), "BufferViewD
 // Description of a texture
 struct TextureDesc
 {
-  TextureViewBit allowedViewBits;
+  EnumAsUint32<TextureViewBit> allowedViewBits;
   StorageOption option;
   MultiSampleFlag samples;
   PixelFormat format;
@@ -1663,8 +1825,9 @@ struct TextureDesc
   uint32_t depth;
   uint32_t layers;
   uint32_t mipLevels;
+  uint64_t deviceMask;
 
-  TextureDesc(TextureViewBit _allowedViewBits = TextureViewBit::ShaderRead, StorageOption _option = StorageOption::Shared, MultiSampleFlag _samples = MultiSampleFlag::MS1x, PixelFormat _format = PixelFormat::RGBA16Uint, uint32_t _width = 0, uint32_t _height = 0, uint32_t _depth = 0, uint32_t _layers = 0, uint32_t _mipLevels = 0)
+  TextureDesc(TextureViewBit _allowedViewBits = TextureViewBit::ShaderRead, StorageOption _option = StorageOption::Shared, MultiSampleFlag _samples = MultiSampleFlag::MS1x, PixelFormat _format = PixelFormat::RGBA16Uint, uint32_t _width = 0, uint32_t _height = 0, uint32_t _depth = 0, uint32_t _layers = 0, uint32_t _mipLevels = 0, uint64_t _deviceMask = 0)
   : allowedViewBits(_allowedViewBits)
   , option(_option)
   , samples(_samples)
@@ -1674,7 +1837,8 @@ struct TextureDesc
   , depth(_depth)
   , layers(_layers)
   , mipLevels(_mipLevels)
-  {}
+  , deviceMask(_deviceMask)
+  {  }
 
   TextureDesc& SetAllowedViewBits(TextureViewBit _allowedViewBits)
   {
@@ -1729,6 +1893,12 @@ struct TextureDesc
     mipLevels = _mipLevels;
     return *this;
   }
+
+  TextureDesc& SetDeviceMask(uint64_t _deviceMask)
+  {
+    deviceMask = _deviceMask;
+    return *this;
+  }
 };
 
 static_assert(sizeof(TextureDesc) == sizeof(ngfxTextureDesc), "TextureDesc & ngfxTextureDesc Size Not Equal!");
@@ -1737,7 +1907,7 @@ static_assert(sizeof(TextureDesc) == sizeof(ngfxTextureDesc), "TextureDesc & ngf
 struct TextureViewDesc
 {
   ResourceViewType view;
-  ResourceState state;
+  EnumAsUint32<ResourceState> state;
   TextureDimension dimension;
   uint32_t mipLevel;
 
@@ -1746,7 +1916,7 @@ struct TextureViewDesc
   , state(_state)
   , dimension(_dimension)
   , mipLevel(_mipLevel)
-  {}
+  {  }
 
   TextureViewDesc& SetView(ResourceViewType _view)
   {
@@ -1783,7 +1953,7 @@ struct VertexLayout
   VertexLayout(VertexInputRate _rate = VertexInputRate::PerVertex, uint32_t _stride = 0)
   : rate(_rate)
   , stride(_stride)
-  {}
+  {  }
 
   VertexLayout& SetRate(VertexInputRate _rate)
   {
@@ -1810,7 +1980,7 @@ struct VertexAttribute
   : format(_format)
   , offset(_offset)
   , slot(_slot)
-  {}
+  {  }
 
   VertexAttribute& SetFormat(VertexFormat _format)
   {
@@ -1846,7 +2016,7 @@ struct VertexInputState
   , attributeCount(_attributeCount)
   , pLayouts(_pLayouts)
   , layoutCount(_layoutCount)
-  {}
+  {  }
 
   VertexInputState& SetPAttributes(const VertexAttribute * _pAttributes)
   {
@@ -1882,19 +2052,28 @@ struct RenderPipelineDesc
   BlendState blendState;
   DepthStencilState depthStencil;
   VertexInputState inputState;
+  uint32_t numRenderTargets;
+  PixelFormat renderTargetFormats[8];
+  PixelFormat depthStencilFormat;
   PrimitiveType primitiveTopology;
   Function * vertexFunction;
   Function * pixelFunction;
+  uint64_t deviceMask;
 
-  RenderPipelineDesc(RasterizerState _rasterState = RasterizerState(), BlendState _blendState = BlendState(), DepthStencilState _depthStencil = DepthStencilState(), VertexInputState _inputState = VertexInputState(), PrimitiveType _primitiveTopology = PrimitiveType::Points, Function * _vertexFunction = nullptr, Function * _pixelFunction = nullptr)
+  RenderPipelineDesc(RasterizerState _rasterState = RasterizerState(), BlendState _blendState = BlendState(), DepthStencilState _depthStencil = DepthStencilState(), VertexInputState _inputState = VertexInputState(), uint32_t _numRenderTargets = 0, PixelFormat _depthStencilFormat = PixelFormat::RGBA16Uint, PrimitiveType _primitiveTopology = PrimitiveType::Points, Function * _vertexFunction = nullptr, Function * _pixelFunction = nullptr, uint64_t _deviceMask = 0)
   : rasterState(_rasterState)
   , blendState(_blendState)
   , depthStencil(_depthStencil)
   , inputState(_inputState)
+  , numRenderTargets(_numRenderTargets)
+  , depthStencilFormat(_depthStencilFormat)
   , primitiveTopology(_primitiveTopology)
   , vertexFunction(_vertexFunction)
   , pixelFunction(_pixelFunction)
-  {}
+  , deviceMask(_deviceMask)
+  {
+    memset(renderTargetFormats, 0, sizeof(renderTargetFormats));
+  }
 
   RenderPipelineDesc& SetRasterState(RasterizerState _rasterState)
   {
@@ -1920,6 +2099,24 @@ struct RenderPipelineDesc
     return *this;
   }
 
+  RenderPipelineDesc& SetNumRenderTargets(uint32_t _numRenderTargets)
+  {
+    numRenderTargets = _numRenderTargets;
+    return *this;
+  }
+
+  RenderPipelineDesc& SetRenderTargetFormat(int index, PixelFormat _renderTargetFormats)
+  {
+    renderTargetFormats[index] = _renderTargetFormats;
+    return *this;
+  }
+
+  RenderPipelineDesc& SetDepthStencilFormat(PixelFormat _depthStencilFormat)
+  {
+    depthStencilFormat = _depthStencilFormat;
+    return *this;
+  }
+
   RenderPipelineDesc& SetPrimitiveTopology(PrimitiveType _primitiveTopology)
   {
     primitiveTopology = _primitiveTopology;
@@ -1937,6 +2134,12 @@ struct RenderPipelineDesc
     pixelFunction = _pixelFunction;
     return *this;
   }
+
+  RenderPipelineDesc& SetDeviceMask(uint64_t _deviceMask)
+  {
+    deviceMask = _deviceMask;
+    return *this;
+  }
 };
 
 static_assert(sizeof(RenderPipelineDesc) == sizeof(ngfxRenderPipelineDesc), "RenderPipelineDesc & ngfxRenderPipelineDesc Size Not Equal!");
@@ -1944,7 +2147,7 @@ static_assert(sizeof(RenderPipelineDesc) == sizeof(ngfxRenderPipelineDesc), "Ren
 struct ShaderBinding
 {
   const char * name;
-  ShaderStageBit visibility;
+  EnumAsUint32<ShaderStageBit> visibility;
   BindingType bindingType;
   uint32_t slot;
   uint32_t count;
@@ -1955,7 +2158,7 @@ struct ShaderBinding
   , bindingType(_bindingType)
   , slot(_slot)
   , count(_count)
-  {}
+  {  }
 
   ShaderBinding& SetName(const char * _name)
   {
@@ -1990,43 +2193,18 @@ struct ShaderBinding
 
 static_assert(sizeof(ShaderBinding) == sizeof(ngfxShaderBinding), "ShaderBinding & ngfxShaderBinding Size Not Equal!");
 
-struct ShaderLayoutDesc
-{
-  const ShaderBinding * pShaderBindings;
-  uint32_t count;
-
-  ShaderLayoutDesc(const ShaderBinding * _pShaderBindings = nullptr, uint32_t _count = 0)
-  : pShaderBindings(_pShaderBindings)
-  , count(_count)
-  {}
-
-  ShaderLayoutDesc& SetPShaderBindings(const ShaderBinding * _pShaderBindings)
-  {
-    pShaderBindings = _pShaderBindings;
-    return *this;
-  }
-
-  ShaderLayoutDesc& SetCount(uint32_t _count)
-  {
-    count = _count;
-    return *this;
-  }
-};
-
-static_assert(sizeof(ShaderLayoutDesc) == sizeof(ngfxShaderLayoutDesc), "ShaderLayoutDesc & ngfxShaderLayoutDesc Size Not Equal!");
-
 // Description of Pipeline Layout (How to layout bindings)
 struct PipelineLayoutDesc
 {
-  const ShaderLayout * pShaderLayout;
+  const BindTableLayout * pShaderLayout;
   uint32_t shaderLayoutCount;
 
-  PipelineLayoutDesc(const ShaderLayout * _pShaderLayout = nullptr, uint32_t _shaderLayoutCount = 0)
+  PipelineLayoutDesc(const BindTableLayout * _pShaderLayout = nullptr, uint32_t _shaderLayoutCount = 0)
   : pShaderLayout(_pShaderLayout)
   , shaderLayoutCount(_shaderLayoutCount)
-  {}
+  {  }
 
-  PipelineLayoutDesc& SetPShaderLayout(const ShaderLayout * _pShaderLayout)
+  PipelineLayoutDesc& SetPShaderLayout(const BindTableLayout * _pShaderLayout)
   {
     pShaderLayout = _pShaderLayout;
     return *this;
@@ -2051,7 +2229,7 @@ struct AttachmentDesc
   : loadAction(_loadAction)
   , storeAction(_storeAction)
   , texture(_texture)
-  {}
+  {  }
 
   AttachmentDesc& SetLoadAction(LoadAction _loadAction)
   {
@@ -2081,7 +2259,7 @@ struct ColorAttachmentDesc : public AttachmentDesc
   ColorAttachmentDesc(Float32x4 _clearColor = Float32x4())
   : AttachmentDesc()
   , clearColor(_clearColor)
-  {}
+  {  }
 
   ColorAttachmentDesc& SetClearColor(Float32x4 _clearColor)
   {
@@ -2101,7 +2279,7 @@ struct DepthStencilAttachmentDesc : public AttachmentDesc
   : AttachmentDesc()
   , clearDepth(_clearDepth)
   , clearStencil(_clearStencil)
-  {}
+  {  }
 
   DepthStencilAttachmentDesc& SetClearDepth(Float32 _clearDepth)
   {
@@ -2129,7 +2307,7 @@ struct RenderPassDesc
   : pColorAttachments(_pColorAttachments)
   , colorAttachmentsCount(_colorAttachmentsCount)
   , pDepthStencilAttachment(_pDepthStencilAttachment)
-  {}
+  {  }
 
   RenderPassDesc& SetPColorAttachments(ColorAttachmentDesc * _pColorAttachments)
   {
@@ -2152,23 +2330,40 @@ struct RenderPassDesc
 
 static_assert(sizeof(RenderPassDesc) == sizeof(ngfxRenderPassDesc), "RenderPassDesc & ngfxRenderPassDesc Size Not Equal!");
 
-// Description of Render Target
-struct RenderTargetDesc
+// Description of frame buffer
+struct FrameBufferDesc
 {
-  int32_t XX;
+  Texture * colorAttachments[8];
+  Texture * depthStencilAttachment;
+  uint32_t layers;
 
-  RenderTargetDesc(int32_t _XX = 0)
-  : XX(_XX)
-  {}
-
-  RenderTargetDesc& SetXX(int32_t _XX)
+  FrameBufferDesc(Texture * _depthStencilAttachment = nullptr, uint32_t _layers = 0)
+  : depthStencilAttachment(_depthStencilAttachment)
+  , layers(_layers)
   {
-    XX = _XX;
+    memset(colorAttachments, 0, sizeof(colorAttachments));
+  }
+
+  FrameBufferDesc& SetColorAttachment(int index, Texture * _colorAttachments)
+  {
+    colorAttachments[index] = _colorAttachments;
+    return *this;
+  }
+
+  FrameBufferDesc& SetDepthStencilAttachment(Texture * _depthStencilAttachment)
+  {
+    depthStencilAttachment = _depthStencilAttachment;
+    return *this;
+  }
+
+  FrameBufferDesc& SetLayers(uint32_t _layers)
+  {
+    layers = _layers;
     return *this;
   }
 };
 
-static_assert(sizeof(RenderTargetDesc) == sizeof(ngfxRenderTargetDesc), "RenderTargetDesc & ngfxRenderTargetDesc Size Not Equal!");
+static_assert(sizeof(FrameBufferDesc) == sizeof(ngfxFrameBufferDesc), "FrameBufferDesc & ngfxFrameBufferDesc Size Not Equal!");
 
 struct DrawIndexedInstancedDesc
 {
@@ -2184,7 +2379,7 @@ struct DrawIndexedInstancedDesc
   , startId(_startId)
   , baseVertexId(_baseVertexId)
   , startInstanceId(_startInstanceId)
-  {}
+  {  }
 
   DrawIndexedInstancedDesc& SetIndexCountPerInstance(uint32_t _indexCountPerInstance)
   {
@@ -2231,7 +2426,7 @@ struct DrawInstancedDesc
   , instanceCount(_instanceCount)
   , startVertexId(_startVertexId)
   , startInstanceId(_startInstanceId)
-  {}
+  {  }
 
   DrawInstancedDesc& SetVertexCountPerInstance(uint32_t _vertexCountPerInstance)
   {
@@ -2274,7 +2469,7 @@ struct Viewport
   , height(_height)
   , minDepth(_minDepth)
   , maxDepth(_maxDepth)
-  {}
+  {  }
 
   Viewport& SetLeftTop(Float32 _left, Float32 _top)
   {
@@ -2321,7 +2516,7 @@ struct SwapChainDesc
   , numColorBuffers(_numColorBuffers)
   , hasDepthStencilTarget(_hasDepthStencilTarget)
   , depthStencilFormat(_depthStencilFormat)
-  {}
+  {  }
 
   SwapChainDesc& SetPixelFormat(PixelFormat _pixelFormat)
   {
@@ -2376,7 +2571,7 @@ struct ShaderOption
   , entryName(_entryName)
   , profile(_profile)
   , format(_format)
-  {}
+  {  }
 
   ShaderOption& SetStage(ShaderType _stage)
   {
@@ -2425,7 +2620,7 @@ struct CompileOption
   , language(_language)
   , profile(_profile)
   , format(_format)
-  {}
+  {  }
 
   CompileOption& SetStripDebugSymbols(Bool32 _stripDebugSymbols)
   {
@@ -2460,7 +2655,15 @@ struct CompileOption
 
 static_assert(sizeof(CompileOption) == sizeof(ngfxCompileOption), "CompileOption & ngfxCompileOption Size Not Equal!");
 
-struct ShaderLayout : public RefCounted<false>
+struct BindTableLayoutInitializer : public RefCounted<false>
+{
+  virtual void AddBuffer(uint32_t slot, uint32_t count, ShaderStageBit visibility) = 0;
+  virtual void AddTexture(uint32_t slot, uint32_t count, ShaderStageBit visibility) = 0;
+  virtual void AddSampler(uint32_t slot, ShaderStageBit visibility) = 0;
+  virtual Result Initialize(BindTableLayout ** ppBindTableLayout) = 0;
+};
+
+struct BindTableLayout : public RefCounted<false>
 {
 };
 
@@ -2531,17 +2734,11 @@ struct TextureReferType : public VariableType
   virtual TextureDimension TextureDim() = 0;
 };
 
-struct Reflection : public RefCounted<false>
+struct PipelineReflection : public RefCounted<false>
 {
   virtual uint32_t VariableCount() const = 0;
   virtual Variable * VariableAt(uint32_t id) const = 0;
   virtual ShaderType GetStage() const = 0;
-};
-
-struct Compiler : public RefCounted<false>
-{
-  virtual Result Compile(const ShaderOption * option, void * pData, uint32_t size, Function ** output) = 0;
-  virtual Result Reflect(void * pData, uint32_t size, Reflection ** ppResult) = 0;
 };
 
 // Create devices and swapchains
@@ -2549,11 +2746,11 @@ struct Factory : public NamedObject<false>
 {
   virtual Result EnumDevice(uint32_t * count, Device ** ppDevice) = 0;
   virtual Result CreateSwapchain(NotNull const SwapChainDesc * desc, NotNull CommandQueue * pCommandQueue, void * pWindow, NotNull SwapChain ** pSwapchain) = 0;
-  virtual Result CreateCompiler(ShaderLang shaderLang, Compiler ** compiler) = 0;
 };
 
-struct RenderTarget : public NamedObject<false>
+struct FrameBuffer : public NamedObject<false>
 {
+  virtual Bool32 CompatWith(const RenderPass * pRenderPass) = 0;
 };
 
 struct RenderPass : public NamedObject<false>
@@ -2584,11 +2781,11 @@ struct RenderPipeline : public Pipeline
 
 struct PipelineLayout : public NamedObject<false>
 {
-  virtual Result CreateBindingTable(BindingTable ** ppBindingTable) = 0;
+  virtual Result CreateBindTable(BindTable ** ppBindingTable) = 0;
 };
 
 // Shader binding table
-struct BindingTable : public NamedObject<true>
+struct BindTable : public NamedObject<true>
 {
   virtual void SetSampler(uint32_t index, ShaderType shaderVis, Sampler * pSampler) = 0;
   virtual void SetBuffer(uint32_t index, ShaderType shaderVis, BufferView * bufferView) = 0;
@@ -2636,15 +2833,17 @@ struct Device : public NamedObject<true>
 {
   virtual void GetDesc(NotNull DeviceDesc * pDesc) = 0;
   virtual Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) = 0;
-  virtual Result CreateShaderLayout(NotNull const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) = 0;
+  virtual void CreateBindTableLayoutInitializer(NotNull BindTableLayoutInitializer ** ppBTLInitializer) = 0;
   virtual Result CreatePipelineLayout(NotNull const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) = 0;
-  virtual Result CreateBindingTable(NotNull PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) = 0;
+  virtual Result CreateBindTable(NotNull const BindTableLayout * pBindTableLayout, BindTable ** ppBindingTable) = 0;
   virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable PipelineLayout * pPipelineLayout, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
-  virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Nullable PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) = 0;
+  virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState, NotNull PipelineReflection ** ppReflection) = 0;
+  virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Nullable PipelineLayout * pPipelineLayout, Pipeline ** ppPipeline) = 0;
+  virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Pipeline ** ppPipeline, NotNull PipelineReflection ** ppReflection) = 0;
   virtual Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) = 0;
   virtual Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) = 0;
   virtual Result CreateRenderPass(NotNull const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;
-  virtual Result CreateRenderTarget(NotNull const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) = 0;
+  virtual Result CreateFrameBuffer(NotNull const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget) = 0;
   virtual Result CreateSampler(NotNull const SamplerDesc* desc, Sampler ** pSampler) = 0;
   virtual Result CreateBuffer(NotNull const BufferDesc* desc, Buffer ** pBuffer) = 0;
   virtual Result CreateTexture(NotNull const TextureDesc * desc, Texture ** pTexture) = 0;
@@ -2658,30 +2857,26 @@ struct Fence : public NamedObject<false>
   virtual void Reset() = 0;
 };
 
-struct FrameBuffer : public NamedObject<false>
-{
-};
-
 struct CommandQueue : public NamedObject<true>
 {
-  virtual CommandBuffer * CommandBuffer() = 0;
+  virtual Result CreateCommandBuffer(CommandBuffer ** ppComandBuffer) = 0;
 };
 
 // Gpu Command Buffer
 struct CommandBuffer : public NamedObject<true>
 {
   virtual void Commit(Fence * pFence) = 0;
-  virtual RenderCommandEncoder * RenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass) = 0;
-  virtual ComputeCommandEncoder * ComputeCommandEncoder() = 0;
-  virtual CopyCommandEncoder * CopyCommandEncoder() = 0;
-  virtual ParallelRenderCommandEncoder * ParallelCommandEncoder() = 0;
+  virtual Result CreateRenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass, RenderCommandEncoder ** ppRenderCommandEncoder) = 0;
+  virtual Result CreateComputeCommandEncoder(ComputeCommandEncoder ** ppComputeCommandEncoder) = 0;
+  virtual Result CreateCopyCommandEncoder(CopyCommandEncoder ** ppCopyCommandEncoder) = 0;
+  virtual Result CreateParallelCommandEncoder(ParallelRenderCommandEncoder ** ppCopyCommandEncoder) = 0;
 };
 
 struct CommandEncoder : public NamedObject<true>
 {
   virtual void Barrier(Resource * pResource) = 0;
   virtual void SetPipeline(Pipeline* pPipelineState) = 0;
-  virtual void SetBindingTable(BindingTable * pBindingTable) = 0;
+  virtual void SetBindTable(BindTable * pBindingTable) = 0;
   virtual void EndEncode() = 0;
 };
 
@@ -2706,6 +2901,7 @@ struct RenderCommandEncoder : public CommandEncoder
   virtual void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer) = 0;
   virtual void DrawInstanced(const DrawInstancedDesc * drawParam) = 0;
   virtual void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam) = 0;
+  virtual void DrawIndirect(Buffer * pIndirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) = 0;
   virtual void Present(Drawable * pDrawable) = 0;
 };
 

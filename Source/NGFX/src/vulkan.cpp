@@ -2,6 +2,10 @@
 #include <KTL/Allocator.hpp>
 #include <Core/Os.h>
 
+#if K3DCOMPILER_MSVC
+#pragma warning(disable:4267)
+#endif
+
 #if K3DPLATFORM_OS_WIN
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #elif K3DPLATFORM_OS_ANDROID
@@ -13,29 +17,36 @@
 #include "ngfx.h"
 #include "vulkan_glslang.h"
 #include <vector>
+#include <list>
 #include <set>
 
 using namespace ngfx;
+using namespace std;
 
 using Os::File;
 using Os::MemMapFile;
 
 #define VULKAN_ALLOCATOR nullptr
 
-static std::vector<const char*> RequiredLayers =
+static vector<const char*> RequiredLayers =
 { 
   "VK_LAYER_LUNARG_standard_validation" 
 };
 
-static std::vector<const char*> RequiredInstanceExtensions =
+static vector<const char*> RequiredInstanceExtensions =
 {
   VK_KHR_SURFACE_EXTENSION_NAME,
-  VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+  VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+  VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
 };
 
 static std::vector<const char *> RequiredDeviceExtensions = 
 { 
-  VK_KHR_SWAPCHAIN_EXTENSION_NAME 
+  VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+  VK_KHX_EXTERNAL_MEMORY_EXTENSION_NAME,
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+  VK_KHX_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
+#endif
 };
 
 enum class Log
@@ -328,6 +339,41 @@ VkShaderStageFlagBits ConvertShaderTypeToVulkanEnum(ShaderType const& e) {
   }
   return VK_SHADER_STAGE_ALL;
 }
+
+VkVertexInputRate ConvertVertexInputRateToVulkanEnum(VertexInputRate const& e) {
+  switch (e) {
+  case VertexInputRate::PerVertex:
+    return VK_VERTEX_INPUT_RATE_VERTEX;
+  case VertexInputRate::PerInstance:
+    return VK_VERTEX_INPUT_RATE_INSTANCE;
+  }
+  return VK_VERTEX_INPUT_RATE_MAX_ENUM;
+}
+
+VkFormat g_VertexFormatTable[] = { 
+  VK_FORMAT_R32_SFLOAT,
+  VK_FORMAT_R32G32_SFLOAT,
+  VK_FORMAT_R32G32B32_SFLOAT,
+  VK_FORMAT_R32G32B32A32_SFLOAT };
+
+VkLogicOp ConvertLogicOperationToVulkanEnum(LogicOperation const& e) {
+  switch (e) {
+  case LogicOperation::Clear:
+    return VK_LOGIC_OP_CLEAR;
+  case LogicOperation::And:
+    return VK_LOGIC_OP_AND;
+  case LogicOperation::Xor:
+    return VK_LOGIC_OP_XOR;
+  case LogicOperation::Or:
+    return VK_LOGIC_OP_OR;
+  case LogicOperation::Nor:
+    return VK_LOGIC_OP_NOR;
+  case LogicOperation::Invert:
+    return VK_LOGIC_OP_INVERT;
+  }
+  return VK_LOGIC_OP_MAX_ENUM;
+}
+
 VkFormat ConvertPixelFormatToVulkanEnum(PixelFormat const& e) {
   switch (e) {
   case PixelFormat::RGBA16Uint:
@@ -345,6 +391,7 @@ VkFormat ConvertPixelFormatToVulkanEnum(PixelFormat const& e) {
   case PixelFormat::RGB32Float:
     return VK_FORMAT_R32G32B32_SFLOAT;
   }
+  return VK_FORMAT_MAX_ENUM;
 }
 VkAttachmentLoadOp ConvertLoadActionToVulkanEnum(LoadAction const& e) {
   switch (e) {
@@ -355,6 +402,7 @@ VkAttachmentLoadOp ConvertLoadActionToVulkanEnum(LoadAction const& e) {
   case LoadAction::DontCare:
     return VK_ATTACHMENT_LOAD_OP_CLEAR;
   }
+  return VK_ATTACHMENT_LOAD_OP_MAX_ENUM;
 }
 VkAttachmentStoreOp ConvertStoreActionToVulkanEnum(StoreAction const& e) {
   switch (e) {
@@ -363,6 +411,7 @@ VkAttachmentStoreOp ConvertStoreActionToVulkanEnum(StoreAction const& e) {
   case StoreAction::DontCare:
     return VK_ATTACHMENT_STORE_OP_DONT_CARE;
   }
+  return VK_ATTACHMENT_STORE_OP_MAX_ENUM;
 }
 VkPrimitiveTopology ConvertPrimitiveTypeToVulkanEnum(PrimitiveType const& e) {
   switch (e) {
@@ -375,6 +424,7 @@ VkPrimitiveTopology ConvertPrimitiveTypeToVulkanEnum(PrimitiveType const& e) {
   case PrimitiveType::TriangleStrips:
     return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
   }
+  return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 }
 VkBlendOp ConvertBlendOperationToVulkanEnum(BlendOperation const& e) {
   switch (e) {
@@ -383,6 +433,7 @@ VkBlendOp ConvertBlendOperationToVulkanEnum(BlendOperation const& e) {
   case BlendOperation::Sub:
     return VK_BLEND_OP_SUBTRACT;
   }
+  return VK_BLEND_OP_MAX_ENUM;
 }
 VkBlendFactor ConvertBlendTypeToVulkanEnum(BlendType const& e) {
   switch (e) {
@@ -399,6 +450,7 @@ VkBlendFactor ConvertBlendTypeToVulkanEnum(BlendType const& e) {
   case BlendType::DstAlpha:
     return VK_BLEND_FACTOR_DST_ALPHA;
   }
+  return VK_BLEND_FACTOR_MAX_ENUM;
 }
 VkStencilOp ConvertStencilOperationToVulkanEnum(StencilOperation const& e) {
   switch (e) {
@@ -415,6 +467,7 @@ VkStencilOp ConvertStencilOperationToVulkanEnum(StencilOperation const& e) {
   case StencilOperation::Decrement:
     return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
   }
+  return VK_STENCIL_OP_MAX_ENUM;
 }
 VkCompareOp ConvertComparisonFunctionToVulkanEnum(ComparisonFunction const& e) {
   switch (e) {
@@ -435,6 +488,7 @@ VkCompareOp ConvertComparisonFunctionToVulkanEnum(ComparisonFunction const& e) {
   case ComparisonFunction::Always:
     return VK_COMPARE_OP_ALWAYS;
   }
+  return VK_COMPARE_OP_MAX_ENUM;
 }
 VkPolygonMode ConvertFillModeToVulkanEnum(FillMode const& e) {
   switch (e) {
@@ -443,6 +497,7 @@ VkPolygonMode ConvertFillModeToVulkanEnum(FillMode const& e) {
   case FillMode::Solid:
     return VK_POLYGON_MODE_FILL;
   }
+  return VK_POLYGON_MODE_MAX_ENUM;
 }
 VkCullModeFlagBits ConvertCullModeToVulkanEnum(CullMode const& e) {
   switch (e) {
@@ -453,6 +508,7 @@ VkCullModeFlagBits ConvertCullModeToVulkanEnum(CullMode const& e) {
   case CullMode::Back:
     return VK_CULL_MODE_BACK_BIT;
   }
+  return VK_CULL_MODE_FLAG_BITS_MAX_ENUM;
 }
 VkFilter ConvertFilterModeToVulkanEnum(FilterMode const& e) {
   switch (e) {
@@ -461,6 +517,7 @@ VkFilter ConvertFilterModeToVulkanEnum(FilterMode const& e) {
   case FilterMode::Linear:
     return VK_FILTER_LINEAR;
   }
+  return VK_FILTER_MAX_ENUM;
 }
 VkSamplerAddressMode ConvertAddressModeToVulkanEnum(AddressMode const& e) {
   switch (e) {
@@ -475,7 +532,29 @@ VkSamplerAddressMode ConvertAddressModeToVulkanEnum(AddressMode const& e) {
   case AddressMode::MirrorOnce:
     return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
   }
+  return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
 }
+
+VkImageViewType ConvertTextureDimensionToVulkanEnum(TextureDimension const& e) {
+  switch (e) {
+  case TextureDimension::Tex1D:
+    return VK_IMAGE_VIEW_TYPE_1D;
+  case TextureDimension::Tex2D:
+    return VK_IMAGE_VIEW_TYPE_2D;
+  case TextureDimension::Tex2DMS:
+    return VK_IMAGE_VIEW_TYPE_2D;
+  case TextureDimension::Tex2DArray:
+    return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+  case TextureDimension::Tex3D:
+    return VK_IMAGE_VIEW_TYPE_3D;
+  case TextureDimension::Tex3DArray:
+    return VK_IMAGE_VIEW_TYPE_3D;
+  case TextureDimension::TexCube:
+    return VK_IMAGE_VIEW_TYPE_CUBE;
+  }
+  return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+}
+
 VkSampleCountFlagBits ConvertMultiSampleFlagToVulkanEnum(MultiSampleFlag const& e) {
   switch (e) {
   case MultiSampleFlag::MS1x:
@@ -489,6 +568,7 @@ VkSampleCountFlagBits ConvertMultiSampleFlagToVulkanEnum(MultiSampleFlag const& 
   case MultiSampleFlag::MS16x:
     return VK_SAMPLE_COUNT_16_BIT;
   }
+  return VK_SAMPLE_COUNT_FLAG_BITS_MAX_ENUM;
 }
 
 /*
@@ -506,9 +586,25 @@ public:
   VkDescriptorSet Handle = VK_NULL_HANDLE;
 };
 */
-using ByteCode = std::vector<uint32_t>;
+using ByteCode = vector<uint32_t>;
 
 class VulkanDevice;
+class VulkanBindTableLayout;
+class BindTableAllocator
+{
+public:
+  BindTableAllocator(VulkanDevice* pDevice);
+  ~BindTableAllocator();
+
+  Result Allocate(const VulkanBindTableLayout* pLayout, BindTable** ppTable);
+  void Free(BindTable* ppTable);
+
+  VkDescriptorPool Handle;
+  VulkanDevice* Device;
+
+  vector<VkDescriptorPoolSize> Sizes;
+};
+
 class VulkanLibrary1;
 
 class VulkanFunction1 : public ngfx::Function
@@ -524,10 +620,10 @@ public:
   VkPipelineShaderStageCreateInfo StageInfo;
 
 private:
-  std::string           EntryName;
-  std::string           Source;
-  ngfx::ShaderType      ShaderType;
-  VkShaderModule        ShaderModule = VK_NULL_HANDLE;
+  string           EntryName;
+  string           Source;
+  ngfx::ShaderType ShaderType;
+  VkShaderModule   ShaderModule = VK_NULL_HANDLE;
 };
 
 /**
@@ -550,30 +646,6 @@ private:
   VulkanDevice* Device;
 };
 
-class VulkanDescriptorLayout
-{
-public:
-  VulkanDescriptorLayout(VulkanDevice* pDevice, VkDescriptorSetLayoutBinding*, int);
-  ~VulkanDescriptorLayout();
-
-  VkDescriptorSetLayoutCreateInfo Info = {
-    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-  };
-  VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
-  VulkanDevice* Device;
-};
-
-class VulkanDescriptorPool
-{
-public:
-  VulkanDescriptorPool(VulkanDevice* pDevice, uint64_t MaxSet);
-  ~VulkanDescriptorPool();
-
-
-  VkDescriptorPool Handle = VK_NULL_HANDLE;
-  VulkanDevice* Device;
-};
-
 class VulkanCommandBuffer : public CommandBuffer
 {
 protected:
@@ -581,10 +653,10 @@ protected:
 public:
   VkCommandBuffer Handle = VK_NULL_HANDLE;
   void Commit(Fence * pFence) override;
-  struct RenderCommandEncoder * RenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass) override;
-  struct ComputeCommandEncoder * ComputeCommandEncoder() override;
-  struct ParallelRenderCommandEncoder * ParallelCommandEncoder() override;
-  struct CopyCommandEncoder * CopyCommandEncoder() override;
+  Result CreateRenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass, RenderCommandEncoder **) override;
+  Result CreateComputeCommandEncoder(ComputeCommandEncoder **) override;
+  Result CreateParallelCommandEncoder(ParallelRenderCommandEncoder **) override;
+  Result CreateCopyCommandEncoder(CopyCommandEncoder **) override;
   VulkanCommandBuffer(VulkanQueue* pQueue);
   ~VulkanCommandBuffer();
 };
@@ -600,7 +672,7 @@ public:
 
   void Barrier(Resource * pResource) override;
   void SetPipeline(Pipeline* pPipelineState) override;
-  void SetBindingTable(BindingTable * pBindingTable) override;
+  void SetBindTable(BindTable * pBindTable) override;
   virtual void EndEncode() override;
 
   VkPipelineBindPoint CurrentBindingPoint;
@@ -639,11 +711,12 @@ public:
   void SetBlendConsts(Float32x4 constant) override;
   void SetLineWidth(Float32 width) override;
 
-  void SetIndexBuffer(Buffer * pIndexBuffer);
-  void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer);
+  void SetIndexBuffer(Buffer * pIndexBuffer) override;
+  void SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer * pVertexBuffer) override;
 
-  void DrawInstanced(const DrawInstancedDesc * drawParam);
-  void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam);
+  void DrawInstanced(const DrawInstancedDesc * drawParam) override;
+  void DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam) override;
+  void DrawIndirect(Buffer * pIndirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride) override;
   void Present(Drawable * pDrawable);
 };
 
@@ -652,10 +725,13 @@ class VulkanQueue : public CommandQueue
 public:
   VulkanQueue(class VulkanDevice* pDevice);
   ~VulkanQueue() override;
-  struct CommandBuffer * CommandBuffer() override;
+  Result CreateCommandBuffer(CommandBuffer ** ppComandBuffer) override;
   VulkanDevice* OwningRoot;
   bool IsSupport(CommandQueueType const&type) const;
+
   VkQueue Handle = VK_NULL_HANDLE;
+  VkCommandPool Pool;
+  
   uint32_t FamilyId = 0;
   uint32_t QueueId = 0;
 };
@@ -722,12 +798,13 @@ protected:
   
   VulkanDevice* OwningDevice = nullptr;
   VkPipelineCache Cache = VK_NULL_HANDLE;
+  class VulkanPipelineLayout* Layout = nullptr;
   typename PipelineTrait<T>::CreateInfo Info;
 
   VkResult CreatePipelineCache(void const* InData, uint64 InSize)
   {
-    VkPipelineCacheCreateInfo Info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, InSize, InData};
-    return vkCreatePipelineCache(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Cache);
+    VkPipelineCacheCreateInfo CacheInfo = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, InSize, InData};
+    return vkCreatePipelineCache(OwningDevice->Handle, &CacheInfo, VULKAN_ALLOCATOR, &Cache);
   }
   
   VkResult CreatePipeline()
@@ -772,19 +849,33 @@ public:
 
 protected:
   void InitShaderStages(const RenderPipelineDesc* pDesc);
+  void InitRasterState(const RenderPipelineDesc* pDesc);
+  void InitDepthStencilState(const RenderPipelineDesc* pDesc);
+  void InitBlendState(const RenderPipelineDesc* pDesc);
+  void InitInputState(const RenderPipelineDesc* pDesc);
 
 private:
+  using VertexAttribs = std::vector<VkVertexInputAttributeDescription>;
+  using VertexBindings = std::vector<VkVertexInputBindingDescription>;
+  using BlendAttachStates = std::vector<VkPipelineColorBlendAttachmentState>;
   /* shaders */
   std::vector<VkPipelineShaderStageCreateInfo> Stages;
 
+  VertexAttribs                           VertexInputAttributes;
+  VertexBindings                          VertexInputBindings;
   VkPipelineVertexInputStateCreateInfo    VertexInputState;
+
   VkPipelineInputAssemblyStateCreateInfo  InputAssemblyState;
-  VkPipelineTessellationStateCreateInfo   TessellationState;
-  VkPipelineViewportStateCreateInfo       ViewportState;
+  
   VkPipelineRasterizationStateCreateInfo  RasterizationState;
   VkPipelineMultisampleStateCreateInfo    MultisampleState;
   VkPipelineDepthStencilStateCreateInfo   DepthStencilState;
+  
+  BlendAttachStates                       BlendAttachState;
   VkPipelineColorBlendStateCreateInfo     BlendState;
+  VkPipelineTessellationStateCreateInfo   TessellationState;
+  /* Dynamic state */
+  VkPipelineViewportStateCreateInfo       ViewportState;
   VkPipelineDynamicStateCreateInfo        DynamicState;
 };
 
@@ -795,41 +886,47 @@ public:
   ~VulkanComputePipeline();
 };
 
+class VulkanTextureView;
+// Correspond to VkFramebuffer And TextureViews
 class VulkanDrawable : public Drawable
 {
 public:
-  VulkanDrawable();
+  VulkanDrawable(VulkanDevice* pDevice, const FrameBufferDesc* pDesc);
   ~VulkanDrawable() override;
 
   struct Texture * Texture() override;
 
+  VulkanDevice* Device;
   VkFramebuffer Handle = VK_NULL_HANDLE;
-  class VulkanTextureView* DepthStencilView = nullptr;
+  VulkanTextureView* DepthStencilView = nullptr;
   VulkanTextureView* MainColorView = nullptr;
   std::vector<VulkanTextureView*> OtherAttachments;
 };
 
-RenderCommandEncoder* VulkanCommandBuffer::RenderCommandEncoder(Drawable* pDrawable, RenderPass* pRenderPass)
+Result VulkanCommandBuffer::CreateRenderCommandEncoder(Drawable* pDrawable, RenderPass* pRenderPass, RenderCommandEncoder ** ppEncoder)
 {
-  return OwningRoot->IsSupport(CommandQueueType::Graphics)? 
+  *ppEncoder = OwningRoot->IsSupport(CommandQueueType::Graphics)? 
     new VulkanRenderEncoder(this) : nullptr;
+  return Result::Ok;
 }
 
-ComputeCommandEncoder * VulkanCommandBuffer::ComputeCommandEncoder()
+Result VulkanCommandBuffer::CreateComputeCommandEncoder(ComputeCommandEncoder ** ppEncoder)
 {
-  return OwningRoot->IsSupport(CommandQueueType::Compute) ?
+  *ppEncoder = OwningRoot->IsSupport(CommandQueueType::Compute) ?
     new VulkanComputeEncoder(this) : nullptr;
+  return Result::Ok;
 }
 
-ParallelRenderCommandEncoder * VulkanCommandBuffer::ParallelCommandEncoder()
+Result VulkanCommandBuffer::CreateParallelCommandEncoder(ParallelRenderCommandEncoder ** ppEncoder)
 {
-  return nullptr;
+  return Result::Ok;
 }
 
-CopyCommandEncoder * VulkanCommandBuffer::CopyCommandEncoder()
+Result VulkanCommandBuffer::CreateCopyCommandEncoder(CopyCommandEncoder ** ppEncoder)
 {
-  return OwningRoot->IsSupport(CommandQueueType::Copy) ?
+  *ppEncoder = OwningRoot->IsSupport(CommandQueueType::Copy) ?
     new VulkanCopyEncoder(this) : nullptr;
+  return Result::Ok;
 }
 
 VulkanCommandBuffer::VulkanCommandBuffer(VulkanQueue* pQueue)
@@ -850,12 +947,12 @@ class VulkanSampler : public Sampler
 protected:
   VulkanDevice* OwningDevice;
 private:
-  VkSampler Handle = VK_NULL_HANDLE;
   VkSamplerCreateInfo Info = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 public:
   VulkanSampler(VulkanDevice* pDevice, const SamplerDesc* pDesc);
   ~VulkanSampler();
   Result GetDesc(SamplerDesc * desc) override;
+  VkSampler Handle = VK_NULL_HANDLE;
 };
 
 template<class RHIObj>
@@ -946,11 +1043,10 @@ public:
   TObj GetHandle() const { return Handle; }
 
   VulkanDevice* OwningDevice;
+  ResInfo Info = {};
 
 protected:
   VkMappedMemoryRange MappedMemoryRange = {};
-  
-  ResInfo Info = {};
   VmaMemoryRequirements MemReq = {};
   TObj Handle = VK_NULL_HANDLE;
 };
@@ -964,6 +1060,35 @@ public:
   Result CreateView(const BufferViewDesc * pDesc, BufferView ** ppView) override;
 };
 
+class VulkanBufferView : public BufferView
+{
+public:
+  VulkanBufferView(const BufferViewDesc * pDesc, VulkanBuffer* pBuffer);
+  ~VulkanBufferView() override;
+  VkBufferView Handle;
+  VkBufferViewCreateInfo Info;
+  VulkanBuffer* OwningBuffer;
+  friend class VulkanBuffer;
+};
+
+class VulkanSwapChainTexture : public Texture
+{
+  friend class VulkanSwapChain;
+public:
+  VulkanSwapChainTexture(class VulkanSwapChain* pSwapChain, VkImage Image, const SwapChainDesc* pDesc);
+  ~VulkanSwapChainTexture() override;
+
+  Result GetDesc(TextureDesc * pDesc) override { return Result::Ok; }
+  Result CreateView(const TextureViewDesc * pDesc, TextureView ** ppView) override { return Result::Ok; }
+
+  void * Map(uint64_t offset, uint64_t size) override { return nullptr; }
+  void UnMap() override {}
+
+  VkImage     Image;
+  VkImageView ImageView;
+  VulkanSwapChain* SwapChain;
+};
+
 class VulkanTexture : public TResource<Texture>
 {
 public:
@@ -973,44 +1098,90 @@ public:
   Result CreateView(const TextureViewDesc * pDesc, TextureView ** ppView) override;
 };
 
+class VulkanTextureView : public TextureView
+{
+public:
+  VulkanTextureView(const TextureViewDesc * pDesc, VulkanTexture* pBuffer);
+  ~VulkanTextureView() override;
+  VkImageView Handle;
+  VkImageViewCreateInfo Info;
+  VulkanTexture* OwningTexture;
+  friend class VulkanTexture;
+};
+
 class VulkanPipelineLayout : public PipelineLayout
 {
 public:
   VulkanPipelineLayout(VulkanDevice* pDevice, const PipelineLayoutDesc * pDesc);
+#if VK_LAYOUT_REFLECT
+  // for compute pipeline
+  VulkanPipelineLayout(VulkanDevice* pDevice, const VulkanFunction1* pComputeShader);
+  // for render pipeline
+  VulkanPipelineLayout(VulkanDevice* pDevice, 
+    NotNull const VulkanFunction1* pVertexShader,
+    NotNull const VulkanFunction1* pPixelShader,
+    Nullable const VulkanFunction1* pGeometryShader = nullptr,
+    Nullable const VulkanFunction1* pDomainShader = nullptr,
+    Nullable const VulkanFunction1* pHullShader = nullptr);
+#endif
+  // deconstructor 
   ~VulkanPipelineLayout() override;
-  Result CreateBindingTable(BindingTable ** ppBindingTable) override;
+  Result CreateBindTable(BindTable ** ppBindTable) override;
 
   VkPipelineLayout Handle = VK_NULL_HANDLE;
   VulkanDevice* Device = nullptr;
 
   friend class VulkanDevice;
+private:
+
 };
 
-class VulkanShaderLayout : public ShaderLayout
+class VulkanBindTableLayoutInitializer : public BindTableLayoutInitializer
 {
 public:
+  VulkanBindTableLayoutInitializer(VulkanDevice* pDevice);
+  ~VulkanBindTableLayoutInitializer() override;
+  
+  void AddBuffer(uint32_t slot, uint32_t count, ShaderStageBit visibility) override;
+  void AddTexture(uint32_t slot, uint32_t count, ShaderStageBit visibility) override;
+  void AddSampler(uint32_t slot, ShaderStageBit visibility) override;
+  Result Initialize(BindTableLayout ** ppBindTableLayout) override;
+
   VulkanDevice* OwningDevice = nullptr;
-  VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
   VkDescriptorSetLayoutCreateInfo Info = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+  std::vector<VkDescriptorSetLayoutBinding> DescriptorBindings;
 
-  VulkanShaderLayout(VulkanDevice* pDevice, const ShaderLayoutDesc* pDesc);
-  ~VulkanShaderLayout() override;
+  VkDescriptorPoolCreateInfo PoolInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+  std::vector<VkDescriptorPoolSize> PoolSizes;
 };
 
-class VulkanBindingTable : public BindingTable
+class VulkanBindTableLayout : public BindTableLayout
 {
 public:
-  VulkanBindingTable(VulkanPipelineLayout* pLayout);
-  ~VulkanBindingTable() override;
+  VulkanBindTableLayout(VulkanBindTableLayoutInitializer* pInitializer);
+  ~VulkanBindTableLayout() override;
+
+  VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
+  VulkanBindTableLayoutInitializer* OwningInitializer = nullptr;
+};
+
+class VulkanBindTable : public BindTable
+{
+public:
+  VulkanBindTable(VulkanDevice* pDevice, VkDescriptorSet Ds);
+  ~VulkanBindTable() override;
 
   void SetSampler(uint32_t index, ShaderType shaderVis, Sampler * pSampler) override;
   void SetBuffer(uint32_t index, ShaderType shaderVis, BufferView * bufferView) override;
   void SetTexture(uint32_t index, ShaderType shaderVis, TextureView * textureView) override;
 
-  VkDescriptorSet Handle = VK_NULL_HANDLE;
-  VulkanPipelineLayout* OwningLayout;
+  VkDescriptorSet                   Handle = VK_NULL_HANDLE;
+  std::vector<VkWriteDescriptorSet> WriteDescriptorSets;
+  VulkanDevice*                     Device;
+  VulkanPipelineLayout*             OwningLayout;
 
   friend class VulkanPipelineLayout;
+  friend class BindTableAllocator;
 };
 
 class VulkanFence : public Fence
@@ -1036,15 +1207,17 @@ public:
   ~VulkanDevice() override;
   void GetDesc(DeviceDesc * pDesc) override;
   Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) override;
-  Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) override;
+  void CreateBindTableLayoutInitializer(BindTableLayoutInitializer**) override;
   Result CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) override;
-  Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) override;
+  Result CreateBindTable(NotNull const BindTableLayout * pBindTableLayout, BindTable ** ppBindingTable) override;
   Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) override;
+  Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState, NotNull PipelineReflection ** ppReflection) override;
   Result CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) override;
+  Result CreateComputePipeline(NotNull Function * pComputeFunction, Pipeline ** pPipeline, NotNull PipelineReflection ** ppReflection) override;
   Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) override;
   Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) override;
   Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) override;
-  Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) override;
+  Result CreateFrameBuffer(const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget) override;
   Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) override;
   Result CreateBuffer(const BufferDesc* desc, Buffer ** pBuffer) override;
   Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) override;
@@ -1053,6 +1226,10 @@ public:
   bool SupportAsyncCompute() const { return IsSupportAsyncCompute; }
 
   VkDevice Handle = VK_NULL_HANDLE;
+  VkPhysicalDeviceProperties Prop;
+  VkPhysicalDeviceFeatures Features;
+
+  BindTableAllocator* TableAllocator;
 
 private:
 
@@ -1064,7 +1241,7 @@ private:
   };
 
   VkPhysicalDevice Device = VK_NULL_HANDLE;
-  VkPhysicalDeviceFeatures Features;
+  VkPhysicalDeviceGroupPropertiesKHX DeviceGroupProperties;
   VmaAllocator MemoryAllocator = nullptr;
   std::vector<QueueInfo> QueueInfos;
   bool IsSupportAsyncCompute;
@@ -1082,17 +1259,33 @@ VulkanQueue::VulkanQueue(VulkanDevice* pDevice)
 {
   OwningRoot->AddInternalRef();
   vkGetDeviceQueue(OwningRoot->Handle, 0, 0, &Handle);
+  VkCommandPoolCreateInfo PoolInfo = {
+    VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO
+  };
+  PoolInfo.queueFamilyIndex = FamilyId;
+  PoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT
+  CHECK(vkCreateCommandPool(OwningRoot->Handle, &PoolInfo, VULKAN_ALLOCATOR, &Pool));
 }
 
 VulkanQueue::~VulkanQueue()
 {
+  vkDestroyCommandPool(OwningRoot->Handle, Pool, VULKAN_ALLOCATOR);
   OwningRoot->ReleaseInternal();
 }
 
-CommandBuffer * VulkanQueue::CommandBuffer()
+Result VulkanQueue::CreateCommandBuffer(CommandBuffer ** ppCmdBuffer)
 {
-  
-  return nullptr;
+  VkCommandBuffer CmdBuffer = VK_NULL_HANDLE;
+  VkCommandBufferAllocateInfo AllocInfo = {
+    VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr,
+    Pool,
+    VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    1
+  };
+  CHECK(vkAllocateCommandBuffers(OwningRoot->Handle, &AllocInfo, &CmdBuffer));
+  //
+  vkFreeCommandBuffers(OwningRoot->Handle, Pool, 1, &CmdBuffer);
+  return Result::Ok;
 }
 
 bool VulkanQueue::IsSupport(CommandQueueType const& type) const
@@ -1149,19 +1342,19 @@ VulkanBuffer::VulkanBuffer(VulkanDevice * pDevice, const BufferDesc* pDesc)
 {
   Info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
   Info.size = pDesc->size;
-  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::UnOrderedAccess)
+  if (pDesc->allowedViewBits & BufferViewBit::UnOrderedAccess)
   {
     Info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
   }
-  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::VertexBuffer)
+  if (pDesc->allowedViewBits & BufferViewBit::VertexBuffer)
   {
     Info.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   }
-  if ((uint32_t)pDesc->allowedViewBits & (uint32_t)BufferViewBit::ConstantBuffer)
+  if (pDesc->allowedViewBits & BufferViewBit::ConstantBuffer)
   {
     Info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
   }
-  if ((uint32_t)pDesc->option & (uint32)StorageOption::Private)
+  if ((uint32_t)pDesc->option & (uint32_t)StorageOption::Private)
   {
     Info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   }
@@ -1180,8 +1373,41 @@ Result VulkanBuffer::GetDesc(BufferDesc * pDesc)
   return Result::Ok;
 }
 
+VulkanBufferView::VulkanBufferView(const BufferViewDesc * pDesc, VulkanBuffer * pBuffer)
+  : OwningBuffer(pBuffer)
+  , Info{ VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO }
+{
+  OwningBuffer->AddInternalRef();
+  switch (pDesc->view)
+  {
+  case ResourceViewType::LinearBuffer: // Simple Buffer
+  case ResourceViewType::UnorderAccessBuffer: // Simple Buffer
+    break;
+  case ResourceViewType::SampledTexture: // Uniform Texel Buffer
+  case ResourceViewType::UnorderAccessTexture: // Storage Texel Buffer
+    break;
+  }
+  //pDesc->
+
+  Info.buffer = pBuffer->GetHandle();
+  Info.format; pDesc->stride;
+  Info.offset = pDesc->offset;
+  Info.range = pDesc->size;
+  CHECK(vkCreateBufferView(OwningBuffer->OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
+}
+
+VulkanBufferView::~VulkanBufferView()
+{
+  if (Handle)
+  {
+    vkDestroyBufferView(OwningBuffer->OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  }
+  OwningBuffer->ReleaseInternal();
+}
+
 Result VulkanBuffer::CreateView(const BufferViewDesc * pDesc, BufferView ** ppView)
 {
+  *ppView = new VulkanBufferView(pDesc, this);
   return Result::Ok;
 }
 
@@ -1208,46 +1434,45 @@ VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
   {
     Info.imageType = VK_IMAGE_TYPE_3D;
   }
-
+  Info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   Info.samples = ConvertMultiSampleFlagToVulkanEnum(pDesc->samples);
 
-  TextureViewBit usage = pDesc->allowedViewBits;
-  if (((uint32_t)usage & (uint32_t)TextureViewBit::RenderTarget))
+  auto usage = pDesc->allowedViewBits;
+  if (usage & TextureViewBit::RenderTarget)
   {
     Info.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    //Info.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     if (pDesc->option != StorageOption::Private)
     {
       LogPrint(Log::Error, "Texture", "When Texture used as RenderTarget, StorageOption should be PRIVATE!\n");
       assert(0);
     }
   }
-  if (((uint32_t)usage & (uint32_t)TextureViewBit::DepthStencil))
+  if (usage & TextureViewBit::DepthStencil)
   {
     Info.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    //Info.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
   }
-  if (((uint32_t)usage & (uint32_t)TextureViewBit::DepthStencil))
-  {
-    Info.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  }
-  if (((uint32_t)usage & (uint32_t)TextureViewBit::ShaderRead))
+  if (usage & TextureViewBit::ShaderRead)
   {
     Info.usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
   }
-  if (((uint32_t)usage & (uint32_t)TextureViewBit::ShaderWrite))
+  if (usage & TextureViewBit::ShaderWrite)
   {
     Info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+    Info.initialLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   }
   
   if (pDesc->option == StorageOption::Managed ||
     pDesc->option == StorageOption::Shared)
   {
     Info.tiling = VK_IMAGE_TILING_LINEAR;
+    Info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
   }
   else if (pDesc->option == StorageOption::Private)
   {
     Info.tiling = VK_IMAGE_TILING_OPTIMAL;
   }
-  Info.initialLayout;
 
   Info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1256,6 +1481,7 @@ VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
 
 VulkanTexture::~VulkanTexture()
 {
+
 }
 
 class VulkanSwapChain : public SwapChain
@@ -1268,10 +1494,15 @@ public:
   uint32_t BufferCount() override;
   VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const SwapChainDesc* pDesc, VulkanQueue* pQueue);
   ~VulkanSwapChain() override;
+
+  vector<VulkanDrawable*> SwapChainDrawables;
+  VulkanDevice* GetDevice() const { return OwningDevice; }
+
 private:
   VkSwapchainKHR Handle = VK_NULL_HANDLE;
   VkSurfaceKHR Surface = VK_NULL_HANDLE;
   VkSwapchainCreateInfoKHR CreateInfo;
+
 protected:
   VulkanFactory* OwningRoot;
   VulkanDevice* OwningDevice;
@@ -1283,10 +1514,12 @@ class VulkanFactory : public Factory
 {
 public:
   bool Debug = false;
+  bool PreferLinkedGpu = true;
+  bool PreferCrossVendor = true;
+  bool VRSupport = true;
 
   Result EnumDevice(uint32_t * count, Device ** ppDevice);
   Result CreateSwapchain(const SwapChainDesc * desc, CommandQueue * pCommandQueue, void * pWindow, SwapChain ** pSwapchain);
-  Result CreateCompiler(ShaderLang shaderLang, Compiler ** compiler);
   
   friend NGFX_API Result CreateFactory(Factory ** ppFactory, bool debugEnabled)
   {
@@ -1308,10 +1541,14 @@ public:
     }
 
     uint32_t layerExtPropCount = 0;
-    std::vector<VkExtensionProperties> extProps;
     vkEnumerateInstanceExtensionProperties(nullptr, &layerExtPropCount, nullptr);
-    extProps.resize(layerExtPropCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &layerExtPropCount, extProps.data());
+    AvailableExtensions.resize(layerExtPropCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &layerExtPropCount, AvailableExtensions.data());
+    LogPrint(Log::Info, "Factory", "Dumping Instance Extensions:\n");
+    for (auto extProp : AvailableExtensions)
+    {
+      LogPrint(Log::Info, "Factory", "\t%s \n", extProp.extensionName);
+    }
 
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -1332,6 +1569,12 @@ public:
       instanceCreateInfo.ppEnabledLayerNames = RequiredLayers.data();
     }
     
+    if (PreferLinkedGpu)
+    {
+      RequiredInstanceExtensions.push_back(VK_KHX_DEVICE_GROUP_CREATION_EXTENSION_NAME);
+      LogPrint(Log::Info, "Factory", "MultiGpu Extension Found: %s \n", VK_KHX_DEVICE_GROUP_CREATION_EXTENSION_NAME);
+    }
+
     instanceCreateInfo.enabledExtensionCount = RequiredInstanceExtensions.size();
     instanceCreateInfo.ppEnabledExtensionNames = RequiredInstanceExtensions.data();
     CHECK(vkCreateInstance(&instanceCreateInfo, VULKAN_ALLOCATOR, &Handle));
@@ -1340,6 +1583,9 @@ public:
   {
     vkDestroyInstance(Handle, VULKAN_ALLOCATOR);
   }
+
+  std::vector<VkExtensionProperties> AvailableExtensions;
+
 private:
   friend class VulkanSwapChain;
   VkInstance Handle = VK_NULL_HANDLE;
@@ -1351,6 +1597,7 @@ private:
 VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDevice)
 : OwningRoot(pFactory)
 , Device(PhysicalDevice)
+, TableAllocator(nullptr)
 {
   OwningRoot->AddInternalRef();
 
@@ -1360,11 +1607,8 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   QueueFamilyProps.resize(queueCount);
   vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueCount, QueueFamilyProps.data());
   QueueInfos.resize(queueCount);
-  VkPhysicalDeviceProperties Prop;
   vkGetPhysicalDeviceProperties(Device, &Prop);
-
   // Create Command Queue
-  float QueuePriority = 0.0f;
   std::vector<VkDeviceQueueCreateInfo> DeviceQueueInfo;
   DeviceQueueInfo.resize(queueCount);
   std::vector<float*> QueuePriorities;
@@ -1395,13 +1639,6 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
   }
   IsSupportAsyncCompute = GfxQueueId != CptQueueId;
 
-  LogPrint(Log::Info, "Device", "Vendor: %s\n\tType: %s\n\tVulkan: %d.%d.%d\n\tAsyncCompute:%d\n",
-    Prop.deviceName,
-    DeviceType(Prop.deviceType),
-    VK_VERSION_MAJOR(Prop.apiVersion),
-    VK_VERSION_MINOR(Prop.apiVersion),
-    VK_VERSION_PATCH(Prop.apiVersion), IsSupportAsyncCompute);
-
   uint32_t extCount = 0;
   std::vector<VkExtensionProperties> exts;
   vkEnumerateDeviceExtensionProperties(Device, nullptr, &extCount, nullptr);
@@ -1423,7 +1660,19 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
 
   vkGetPhysicalDeviceFeatures(Device, &Features);
 
-  // KHX ?
+  // extension diff
+  VK_MAKE_VERSION(1, 0, 38);
+  VK_MAKE_VERSION(1, 0, 46);
+  VK_MAKE_VERSION(1, 0, 54);
+
+  LogPrint(Log::Info, "Device", "Vendor: %s\n\tType: %s\n\tVulkan: %d.%d.%d\n\tAsyncCompute:%d\n\tMultiDraweIndirect: %d\n\tMultiViewport: %d\n",
+    Prop.deviceName,
+    DeviceType(Prop.deviceType),
+    VK_VERSION_MAJOR(Prop.apiVersion),
+    VK_VERSION_MINOR(Prop.apiVersion),
+    VK_VERSION_PATCH(Prop.apiVersion), IsSupportAsyncCompute,
+    Features.multiDrawIndirect, Features.multiViewport);
+
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   deviceCreateInfo.pNext = NULL;
@@ -1436,8 +1685,43 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
     {
       RequiredDeviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
     }
-    deviceCreateInfo.enabledLayerCount = RequiredLayers.size();
-    deviceCreateInfo.ppEnabledLayerNames = RequiredLayers.data();
+  }
+  deviceCreateInfo.enabledLayerCount = RequiredLayers.size();
+  deviceCreateInfo.ppEnabledLayerNames = RequiredLayers.data();
+
+  // Multi GPU
+  if (OwningRoot->PreferLinkedGpu)
+  {
+    const char* linkGpuExt = VK_KHX_DEVICE_GROUP_EXTENSION_NAME;
+    bool linkedGpuSupported = true;
+    if (deviceExtensions.find(linkGpuExt) != deviceExtensions.end())
+    {
+      LogPrint(Log::Info, "Device", "MultiGpuExtension found: %s\n", linkGpuExt);
+      RequiredDeviceExtensions.push_back(linkGpuExt);
+    }
+    else
+    {
+      linkedGpuSupported = false;
+    }
+    LogPrint(Log::Info, "Device", "MultiGpu Availability: %d\n", linkedGpuSupported);
+
+    VkDeviceGroupDeviceCreateInfoKHX deviceGroupCreateInfo = {};
+    deviceGroupCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO_KHX;
+    //deviceGroupCreateInfo.physicalDeviceCount = deviceGroupProperties.physicalDeviceCount;
+    //deviceGroupCreateInfo.pPhysicalDevices = deviceGroupProperties.physicalDevices;
+    deviceCreateInfo.pNext = &deviceGroupCreateInfo;
+  }
+
+  if (OwningRoot->PreferCrossVendor)
+  {
+    // external_memory on NVIDIA
+    // external_semaphore 
+  }
+
+  if (OwningRoot->VRSupport)
+  {
+    // external_memory Oculus SDK
+    // multi viewport
   }
   
   if (RequiredDeviceExtensions.size() > 0)
@@ -1457,10 +1741,15 @@ VulkanDevice::VulkanDevice(VulkanFactory* pFactory, VkPhysicalDevice PhysicalDev
     VULKAN_ALLOCATOR
   };
   vmaCreateAllocator(&AllocCreateInfo, &MemoryAllocator);
+  TableAllocator = new BindTableAllocator(this);
 }
 
 VulkanDevice::~VulkanDevice()
 {
+  if (TableAllocator)
+  {
+    delete TableAllocator;
+  }
   vmaDestroyAllocator(MemoryAllocator);
   vkDestroyDevice(Handle, VULKAN_ALLOCATOR);
   OwningRoot->ReleaseInternal();
@@ -1468,7 +1757,7 @@ VulkanDevice::~VulkanDevice()
 
 void VulkanDevice::GetDesc(DeviceDesc * pDesc)
 {
-  VkDebugMarkerObjectNameInfoEXT ext;
+  //VkDebugMarkerObjectNameInfoEXT ext;
   //vkDebugMarkerSetObjectNameEXT(Handle, &ext);
 }
 
@@ -1498,7 +1787,7 @@ Result VulkanDevice::CreateCommandQueue(CommandQueueType queueType, CommandQueue
     {
       if (Info.Flags & VK_QUEUE_COMPUTE_BIT)
       {
-        uint32_t qId = 0;
+        //uint32_t qId = 0;
         vkGetDeviceQueue(Handle, Info.Family, 0, &pVkQueue->Handle);
         pVkQueue->FamilyId = Info.Family;
         pVkQueue->QueueId = 0;
@@ -1512,7 +1801,7 @@ Result VulkanDevice::CreateCommandQueue(CommandQueueType queueType, CommandQueue
     {
       if (Info.Flags & VK_QUEUE_TRANSFER_BIT)
       {
-        uint32_t qId = 0;
+        //uint32_t qId = 0;
         vkGetDeviceQueue(Handle, Info.Family, 0, &pVkQueue->Handle);
         pVkQueue->FamilyId = Info.Family;
         pVkQueue->QueueId = 0;
@@ -1525,16 +1814,20 @@ Result VulkanDevice::CreateCommandQueue(CommandQueueType queueType, CommandQueue
   return Result::Ok;
 }
 
-Result VulkanDevice::CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout)
+void VulkanDevice::CreateBindTableLayoutInitializer(BindTableLayoutInitializer ** ppInitializer)
 {
-  *ppShaderLayout = new VulkanShaderLayout(this, pShaderLayoutDesc);
-  return Result::Ok;
+  *ppInitializer = new VulkanBindTableLayoutInitializer(this);
 }
 
 Result VulkanDevice::CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout)
 {
   *ppPipelineLayout = new VulkanPipelineLayout(this, pPipelineLayoutDesc);
   return Result::Ok;
+}
+
+Result VulkanDevice::CreateBindTable(NotNull const BindTableLayout * pBindTableLayout, BindTable ** ppBindingTable)
+{
+  return TableAllocator->Allocate(static_cast<const VulkanBindTableLayout*>(pBindTableLayout), ppBindingTable);
 }
 
 void VulkanSwapChain::InitWithRenderPass(RenderPass * pRenderPass)
@@ -1593,7 +1886,29 @@ VulkanSwapChain::VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const S
 
   LogPrint(Log::Info, "SwapChain", "Chosen SwapChain Format %s.\n", StrVkFormat(CreateInfo.imageFormat));
 
-  vkCreateSwapchainKHR(OwningDevice->Handle, &CreateInfo, VULKAN_ALLOCATOR, &Handle);
+  CHECK(vkCreateSwapchainKHR(OwningDevice->Handle, &CreateInfo, VULKAN_ALLOCATOR, &Handle));
+  uint32_t ImageCount = 0;
+  vkGetSwapchainImagesKHR(OwningDevice->Handle, Handle, &ImageCount, nullptr);
+  vector<VkImage> Images(ImageCount);
+  vkGetSwapchainImagesKHR(OwningDevice->Handle, Handle, &ImageCount, Images.data());
+  // Initialize Image Views
+  for (auto Image : Images)
+  {
+    new VulkanSwapChainTexture(this, Image, pDesc);
+  }
+  if (pDesc->hasDepthStencilTarget)
+  {
+    Ptr<Texture> depthStecilTexture;
+    OwningDevice->CreateTexture(nullptr, depthStecilTexture.GetAddressOf());
+
+    Ptr<TextureView> depthStencilView;
+    depthStecilTexture->CreateView(nullptr, depthStencilView.GetAddressOf());
+
+  }
+
+  Ptr<FrameBuffer> presentFbo;
+//  FrameBufferDesc pFBoDesc;
+//  pFBoDesc.depthStencilAttachment = depthS
 }
 
 VulkanSwapChain::~VulkanSwapChain()
@@ -1607,12 +1922,6 @@ VulkanSwapChain::~VulkanSwapChain()
 Result VulkanFactory::CreateSwapchain(const SwapChainDesc* desc, CommandQueue* pCommandQueue, void* pWindow, SwapChain** pSwapchain)
 {  
   *pSwapchain = new VulkanSwapChain(this, pWindow, desc, static_cast<VulkanQueue*>(pCommandQueue));
-  return Result::Ok;
-}
-
-Result VulkanFactory::CreateCompiler(ShaderLang shaderLang, Compiler ** compiler)
-{
-//  *compiler = new GlslangCompiler;
   return Result::Ok;
 }
 
@@ -1648,25 +1957,52 @@ Result VulkanTexture::GetDesc(TextureDesc * pDesc)
   return Result::Ok;
 }
 
+
+VulkanTextureView::VulkanTextureView(const TextureViewDesc * pDesc, VulkanTexture * pTexture)
+  : OwningTexture(pTexture)
+  , Info{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO }
+{
+  OwningTexture->AddInternalRef();
+  Info.image = pTexture->GetHandle();
+  Info.format = pTexture->Info.format;
+  Info.viewType = ConvertTextureDimensionToVulkanEnum(pDesc->dimension);
+  Info.components;
+  Info.subresourceRange;
+  CHECK(vkCreateImageView(OwningTexture->OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
+}
+
+VulkanTextureView::~VulkanTextureView()
+{
+  vkDestroyImageView(OwningTexture->OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  OwningTexture->ReleaseInternal();
+}
+
 Result VulkanTexture::CreateView(const TextureViewDesc * pDesc, TextureView ** ppView)
 {
+  *ppView = new VulkanTextureView(pDesc, this);
   return Result::Ok;
 }
 
-Result VulkanDevice::CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable)
+Result VulkanDevice::CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** ppPipeline)
+{
+  * ppPipeline = new VulkanRenderPipeline(this, pPipelineDesc, pRenderPass, pPipelineLayout);
+  return Result::Ok;
+}
+
+Result VulkanDevice::CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState, NotNull PipelineReflection ** ppReflection)
 {
   return Result::Ok;
 }
 
-Result VulkanDevice::CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState)
+Result VulkanDevice::CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** ppPipeline)
 {
-  
+  * ppPipeline = new VulkanComputePipeline(this, pComputeFunction, pPipelineLayout);
   return Result::Ok;
 }
 
-Result VulkanDevice::CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline)
+Result VulkanDevice::CreateComputePipeline(NotNull Function * pComputeFunction, Pipeline ** pPipeline, NotNull PipelineReflection ** ppReflection)
 {
-  return Result::Ok;
+  return Result::Failed;
 }
 
 Result VulkanDevice::CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary)
@@ -1766,7 +2102,7 @@ Result VulkanDevice::CreateRenderPass(const RenderPassDesc * desc, RenderPass **
   return Result::Ok;
 }
 
-Result VulkanDevice::CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget)
+Result VulkanDevice::CreateFrameBuffer(const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget)
 {
   return Result::Ok;
 }
@@ -1820,7 +2156,7 @@ VulkanSampler::VulkanSampler(VulkanDevice* pDevice, const SamplerDesc* pDesc)
   Info.maxLod = pDesc->maxLod;
   Info.borderColor;
   Info.unnormalizedCoordinates;
-  vkCreateSampler(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
+  CHECK(vkCreateSampler(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
 }
 
 VulkanSampler::~VulkanSampler()
@@ -1865,14 +2201,28 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderP
   Info.stageCount = Stages.size();
   Info.pStages = Stages.data();
 
+  InitRasterState(pDesc);
   Info.pRasterizationState = &RasterizationState;
+  Info.pMultisampleState = &MultisampleState;
+
+  InitDepthStencilState(pDesc);
   Info.pDepthStencilState = &DepthStencilState;
+
+  InitBlendState(pDesc);
   Info.pColorBlendState = &BlendState;
-  Info.pDynamicState = &DynamicState;
+  
+  InitInputState(pDesc);
   Info.pInputAssemblyState = &InputAssemblyState;
   Info.pVertexInputState = &VertexInputState;
-  Info.pMultisampleState = &MultisampleState;
+  
+  ViewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
   Info.pViewportState = &ViewportState;
+
+  /* dynamic state set up */
+  DynamicState = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+  Info.pDynamicState = &DynamicState;
+  
+  TessellationState = { VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO };
   Info.pTessellationState = &TessellationState;
 
   CHECK(CreatePipelineCache(nullptr, 0));
@@ -1891,6 +2241,85 @@ void VulkanRenderPipeline::InitShaderStages(const RenderPipelineDesc* pDesc)
     auto pixelShader = static_cast<VulkanFunction1*>(pDesc->pixelFunction);
     Stages.push_back(pixelShader->StageInfo);
   }
+}
+
+void VulkanRenderPipeline::InitRasterState(const RenderPipelineDesc * pDesc)
+{
+  auto Rs = pDesc->rasterState;
+  RasterizationState = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  RasterizationState.polygonMode = ConvertFillModeToVulkanEnum(Rs.fillMode);
+  RasterizationState.cullMode = ConvertCullModeToVulkanEnum(Rs.cullMode);
+  RasterizationState.frontFace = Rs.frontCCW ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
+  RasterizationState.rasterizerDiscardEnable = VK_TRUE;
+  RasterizationState.depthBiasEnable = Rs.depthBias > 0 ? VK_TRUE : VK_FALSE;
+  RasterizationState.depthClampEnable = Rs.depthClipEnable;
+  RasterizationState.depthBiasClamp = Rs.depthBiasClamp;
+  RasterizationState.depthBiasConstantFactor = Rs.depthBias;
+  RasterizationState.depthBiasSlopeFactor = Rs.depthBiasSlope;
+  RasterizationState.lineWidth = 1;
+  
+  MultisampleState = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+  MultisampleState.alphaToCoverageEnable = pDesc->blendState.alphaToCoverageEnable;
+}
+
+void VulkanRenderPipeline::InitDepthStencilState(const RenderPipelineDesc* pDesc)
+{
+  auto Ds = pDesc->depthStencil;
+  DepthStencilState = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+  DepthStencilState.depthTestEnable = Ds.depthEnable;
+  DepthStencilState.stencilTestEnable = Ds.stencilEnable;
+}
+
+void VulkanRenderPipeline::InitBlendState(const RenderPipelineDesc* pDesc)
+{
+  auto Bs = pDesc->blendState;
+  BlendState = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+  BlendAttachState.resize(pDesc->numRenderTargets);
+  BlendState.attachmentCount = pDesc->numRenderTargets;
+  for(uint32_t i =0; i<pDesc->numRenderTargets; i++)
+  {
+    BlendAttachState[i].blendEnable = Bs.renderTargets[i].enable;
+    BlendAttachState[i].alphaBlendOp = ConvertBlendOperationToVulkanEnum(Bs.renderTargets[i].alphaBlendOp);
+    BlendAttachState[i].colorBlendOp = ConvertBlendOperationToVulkanEnum(Bs.renderTargets[i].colorBlendOp);
+    BlendAttachState[i].colorWriteMask = Bs.renderTargets[i].colorWriteMask;
+    BlendAttachState[i].srcAlphaBlendFactor = ConvertBlendTypeToVulkanEnum(Bs.renderTargets[i].srcAlphaBlend);
+    BlendAttachState[i].dstAlphaBlendFactor = ConvertBlendTypeToVulkanEnum(Bs.renderTargets[i].destAlphaBlend);
+    BlendAttachState[i].srcColorBlendFactor = ConvertBlendTypeToVulkanEnum(Bs.renderTargets[i].srcColorBlend);
+    BlendAttachState[i].dstColorBlendFactor = ConvertBlendTypeToVulkanEnum(Bs.renderTargets[i].destColorBlend);
+  }
+  BlendState.pAttachments = BlendAttachState.data();
+  BlendState.logicOpEnable = Bs.logicOpEnable;
+  BlendState.logicOp = ConvertLogicOperationToVulkanEnum(Bs.logicOp);
+}
+
+void VulkanRenderPipeline::InitInputState(const RenderPipelineDesc * pDesc)
+{
+  auto Is = pDesc->inputState;
+  assert(Is.attributeCount);
+  InputAssemblyState = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+  InputAssemblyState.topology = ConvertPrimitiveTypeToVulkanEnum(pDesc->primitiveTopology);
+  
+  VertexInputState = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+  VertexInputAttributes.resize(Is.attributeCount);
+  for (uint32_t i = 0; i < Is.attributeCount; i++)
+  {
+    VertexInputAttributes[i].binding = Is.pAttributes[i].slot;
+    VertexInputAttributes[i].offset = Is.pAttributes[i].offset;
+    VertexInputAttributes[i].format = g_VertexFormatTable[(uint32_t)Is.pAttributes[i].format];
+    VertexInputAttributes[i].location = i;
+  }
+  VertexInputState.vertexAttributeDescriptionCount = VertexInputAttributes.size();
+  VertexInputState.pVertexAttributeDescriptions = VertexInputAttributes.data();
+
+  VertexInputBindings.resize(Is.layoutCount);
+  for (uint32_t i = 0; i < Is.layoutCount; i++)
+  {
+    VertexInputBindings[i].binding = i;
+    VertexInputBindings[i].stride = Is.pLayouts[i].stride;
+    VertexInputBindings[i].inputRate = ConvertVertexInputRateToVulkanEnum(Is.pLayouts[i].rate);
+  }
+  VertexInputState.vertexBindingDescriptionCount = VertexInputBindings.size();
+  VertexInputState.pVertexBindingDescriptions = VertexInputBindings.data();
 }
 
 VulkanRenderPipeline::~VulkanRenderPipeline()
@@ -1973,42 +2402,87 @@ void VulkanPipelineLibrary::Serialize(void * pData, uint64_t Size)
   CHECK(vkGetPipelineCacheData(Device->Handle, Handle, &Size, pData));
 }
 
-
-VulkanShaderLayout::VulkanShaderLayout(VulkanDevice * pDevice, const ShaderLayoutDesc* pDesc)
+VulkanBindTableLayoutInitializer::VulkanBindTableLayoutInitializer(VulkanDevice * pDevice)
   : OwningDevice(pDevice)
 {
   OwningDevice->AddInternalRef();
-  assert(pDesc && pDesc->count >= 0);
-  Info.bindingCount = pDesc->count;
-  VkDescriptorSetLayoutBinding* pSetBindings =
-    (VkDescriptorSetLayoutBinding*)calloc(pDesc->count, sizeof(VkDescriptorSetLayoutBinding));
-  for(uint32_t i; i < pDesc->count; i++)
-  {
-//    pSetBindings[i].stageFlags = pDesc->pShaderBindings[i].visibility;
-    pSetBindings[i].binding = pDesc->pShaderBindings[i].slot;
-  }
-  Info.pBindings = pSetBindings;
+
+  /*
   vkCreateDescriptorSetLayout(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
+  */
 }
 
-VulkanShaderLayout::~VulkanShaderLayout()
+VulkanBindTableLayoutInitializer::~VulkanBindTableLayoutInitializer()
 {
+  /*
   if(Handle)
   {
     vkDestroyDescriptorSetLayout(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
   }
+  */
   OwningDevice->ReleaseInternal();
 }
 
-VulkanDescriptorLayout::VulkanDescriptorLayout(VulkanDevice * pDevice, VkDescriptorSetLayoutBinding * pBindings, int Count)
-  : Device(pDevice)
+
+VkShaderStageFlags ConvertShaderStageBit(ShaderStageBit visibility)
 {
-  Device->AddInternalRef();
+  EnumAsUint32<ShaderStageBit> Enum(visibility);
+  VkShaderStageFlags Flag = 0;
+  if (Enum & ShaderStageBit::Vertex)
+  {
+    Flag |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+  }
+  if (Enum & ShaderStageBit::Compute)
+  {
+    Flag |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  }
+  if (Enum & ShaderStageBit::Fragment)
+  {
+    Flag |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  }
+  if (Enum & ShaderStageBit::Geometry)
+  {
+    Flag |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
+  }
+  return Flag;
 }
 
-VulkanDescriptorLayout::~VulkanDescriptorLayout()
+void VulkanBindTableLayoutInitializer::AddBuffer(uint32_t slot, uint32_t count, ShaderStageBit visibility)
 {
-  Device->ReleaseInternal();
+  DescriptorBindings.push_back({slot, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, count, ConvertShaderStageBit(visibility), nullptr});
+}
+
+void VulkanBindTableLayoutInitializer::AddTexture(uint32_t slot, uint32_t count, ShaderStageBit visibility)
+{
+  DescriptorBindings.push_back({ slot, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, count, ConvertShaderStageBit(visibility), nullptr });
+}
+
+void VulkanBindTableLayoutInitializer::AddSampler(uint32_t slot, ShaderStageBit visibility)
+{
+  DescriptorBindings.push_back({ slot, VK_DESCRIPTOR_TYPE_SAMPLER, 1, ConvertShaderStageBit(visibility), nullptr });
+}
+
+VulkanBindTableLayout::VulkanBindTableLayout(VulkanBindTableLayoutInitializer * pInitializer)
+  : OwningInitializer(pInitializer)
+{
+  OwningInitializer->AddInternalRef();
+  CHECK(vkCreateDescriptorSetLayout(
+    OwningInitializer->OwningDevice->Handle,
+    &pInitializer->Info, VULKAN_ALLOCATOR, &Handle));
+}
+
+VulkanBindTableLayout::~VulkanBindTableLayout()
+{
+  vkDestroyDescriptorSetLayout(OwningInitializer->OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+  OwningInitializer->ReleaseInternal();
+}
+
+Result VulkanBindTableLayoutInitializer::Initialize(BindTableLayout ** ppBindTableLayout)
+{
+  Info.bindingCount = DescriptorBindings.size();
+  Info.pBindings = DescriptorBindings.data();
+  *ppBindTableLayout = new VulkanBindTableLayout(this);
+  return Result::Ok;
 }
 
 VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const ngfx::PipelineLayoutDesc * pDesc)
@@ -2016,16 +2490,32 @@ VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const ngfx::P
 {
   Device->AddInternalRef();
   assert(pDesc && pDesc->shaderLayoutCount);
+  std::vector<VkDescriptorSetLayout> setLayouts;
   VkPipelineLayoutCreateInfo Info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
   Info.setLayoutCount = pDesc->shaderLayoutCount;
-  VkDescriptorSetLayout* pLayouts = (VkDescriptorSetLayout*)calloc(pDesc->shaderLayoutCount, sizeof(VkDescriptorSetLayout*));
-  for(uint32_t i; i < pDesc->shaderLayoutCount; i++)
+  setLayouts.resize(Info.setLayoutCount);
+  for(uint32_t i = 0; i < pDesc->shaderLayoutCount; i++) // error
   {
-    pLayouts[i] = static_cast<const VulkanShaderLayout*>(pDesc->pShaderLayout + i)->Handle;
+    setLayouts[i] = static_cast<const VulkanBindTableLayout*>(pDesc->pShaderLayout + i)->Handle;
   }
-  Info.pSetLayouts = pLayouts;
-  vkCreatePipelineLayout(Device->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
+  Info.pSetLayouts = setLayouts.data();
+  CHECK(vkCreatePipelineLayout(Device->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
 }
+
+#if VK_LAYOUT_REFLECT
+VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, const VulkanFunction1 * pComputeShader)
+{
+}
+
+VulkanPipelineLayout::VulkanPipelineLayout(VulkanDevice * pDevice, 
+  NotNull const VulkanFunction1 * pVertexShader, 
+  NotNull const VulkanFunction1 * pPixelShader, 
+  Nullable const VulkanFunction1 * pGeometryShader, 
+  Nullable const VulkanFunction1 * pDomainShader, 
+  Nullable const VulkanFunction1 * pHullShader)
+{
+}
+#endif
 
 VulkanPipelineLayout::~VulkanPipelineLayout()
 {
@@ -2036,55 +2526,52 @@ VulkanPipelineLayout::~VulkanPipelineLayout()
   Device->ReleaseInternal();
 }
 
-Result VulkanPipelineLayout::CreateBindingTable(BindingTable ** ppBindingTable)
+Result VulkanPipelineLayout::CreateBindTable(BindTable ** ppBindTable)
 {
-  *ppBindingTable = new VulkanBindingTable(this);
+  //*ppBindTable = new VulkanBindTable(this);
   return Result::Ok;
 }
 
-VulkanBindingTable::VulkanBindingTable(VulkanPipelineLayout * pLayout)
-  : OwningLayout(pLayout)
-{
-}
-
-VulkanBindingTable::~VulkanBindingTable()
-{
-}
-
-void VulkanBindingTable::SetSampler(uint32_t index, ShaderType shaderVis, Sampler * pSampler)
-{
-//  vkUpdateDescriptorSets()
-}
-
-void VulkanBindingTable::SetBuffer(uint32_t index, ShaderType shaderVis, BufferView * bufferView)
-{
-}
-
-void VulkanBindingTable::SetTexture(uint32_t index, ShaderType shaderVis, TextureView * textureView)
-{
-}
-
-VulkanDescriptorPool::VulkanDescriptorPool(VulkanDevice * pDevice, uint64_t MaxSet)
-  : Device(pDevice)
+VulkanBindTable::VulkanBindTable(VulkanDevice* pDevice, VkDescriptorSet Ds)
+  : Handle(Ds)
+  , Device(pDevice)
 {
   Device->AddInternalRef();
-  struct DescriptorPoolSize 
-  {
-    VkDescriptorType    type;
-    uint32_t            descriptorCount;
-  };
-  VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-  createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  createInfo.maxSets = 1;
-  createInfo.poolSizeCount = 0;
-  createInfo.pPoolSizes = nullptr;
-  CHECK(vkCreateDescriptorPool(Device->Handle, &createInfo, NULL, &Handle));
 }
 
-VulkanDescriptorPool::~VulkanDescriptorPool()
+VulkanBindTable::~VulkanBindTable()
 {
-  vkDestroyDescriptorPool(Device->Handle, Handle, VULKAN_ALLOCATOR);
   Device->ReleaseInternal();
+}
+
+void VulkanBindTable::SetSampler(uint32_t index, ShaderType shaderVis, Sampler * pSampler)
+{
+  WriteDescriptorSets[index] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, Handle, index, 0 };
+  WriteDescriptorSets[index].descriptorCount = 1;
+  WriteDescriptorSets[index].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+  VkDescriptorImageInfo Info = { static_cast<VulkanSampler*>(pSampler)->Handle, VK_NULL_HANDLE };
+  WriteDescriptorSets[index].pImageInfo = &Info;
+  vkUpdateDescriptorSets(Device->Handle, static_cast<uint32_t>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, NULL);
+}
+
+void VulkanBindTable::SetBuffer(uint32_t index, ShaderType shaderVis, BufferView * bufferView)
+{
+  WriteDescriptorSets[index] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, Handle, index, 0 };
+  WriteDescriptorSets[index].descriptorCount = 1;
+  WriteDescriptorSets[index].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  /*VkDescriptorBufferInfo Info = { static_cast<VulkanBufferView*>(bufferView)->Handle, VK_NULL_HANDLE };
+  WriteDescriptorSets[index].pBufferInfo = &Info;
+  vkUpdateDescriptorSets(Device->Handle, static_cast<uint32_t>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, NULL);*/
+}
+
+void VulkanBindTable::SetTexture(uint32_t index, ShaderType shaderVis, TextureView * textureView)
+{
+  WriteDescriptorSets[index] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, Handle, index, 0 };
+  WriteDescriptorSets[index].descriptorCount = 1;
+  WriteDescriptorSets[index].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+  /*VkDescriptorImageInfo Info = { VK_NULL_HANDLE, static_cast<VulkanTextureView*>(textureView)->Handle, VK_NULL_HANDLE };
+  WriteDescriptorSets[index].pImageInfo = &Info;
+  vkUpdateDescriptorSets(Device->Handle, static_cast<uint32_t>(WriteDescriptorSets.size()), WriteDescriptorSets.data(), 0, NULL);*/
 }
 
 VulkanFence::VulkanFence(VulkanDevice * pDevice)
@@ -2112,12 +2599,48 @@ void VulkanFence::Reset()
 {
 }
 
-VulkanDrawable::VulkanDrawable()
+VulkanDrawable::VulkanDrawable(VulkanDevice* pDevice, const FrameBufferDesc* pDesc)
+  : Device(pDevice)
 {
+  Device->AddInternalRef();
+  VkFramebufferCreateInfo CreateInfo = {
+    VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO
+  };
+  // How to process render pass ? Prebuild ?
+  CreateInfo.renderPass;
+
+  int attachmentNum = 0;
+  for (auto attachment : pDesc->colorAttachments)
+  {
+    if (attachment)
+    {
+      attachmentNum++;
+    }
+  }
+
+  if (pDesc->colorAttachments[0])
+  {
+    TextureDesc desc;
+    pDesc->colorAttachments[0]->GetDesc(&desc);
+    CreateInfo.width = desc.width;
+    CreateInfo.height = desc.height;
+  }
+  if (pDesc->depthStencilAttachment)
+  {
+    attachmentNum++;
+  }
+
+  CreateInfo.attachmentCount = attachmentNum;
+  CreateInfo.pAttachments;
+  CreateInfo.layers = pDesc->layers;
+  CreateInfo.flags;
+  CHECK(vkCreateFramebuffer(Device->Handle, nullptr, VULKAN_ALLOCATOR, &Handle));
 }
 
 VulkanDrawable::~VulkanDrawable()
 {
+  vkDestroyFramebuffer(Device->Handle, Handle, VULKAN_ALLOCATOR);
+  Device->ReleaseInternal();
 }
 
 Texture * VulkanDrawable::Texture()
@@ -2171,17 +2694,18 @@ void TCmdEncoder<T>::SetPipeline(Pipeline * pPipelineState)
 }
 
 template<class T>
-void TCmdEncoder<T>::SetBindingTable(BindingTable * pBindingTable)
+void TCmdEncoder<T>::SetBindTable(BindTable * pBindTable)
 {
-  VulkanBindingTable* bindingTable = static_cast<VulkanBindingTable*>(pBindingTable);
-  VkDescriptorSet sets[] = { bindingTable->Handle };
+  VulkanBindTable* BindTable = static_cast<VulkanBindTable*>(pBindTable);
+  VkDescriptorSet sets[] = { BindTable->Handle };
   vkCmdBindDescriptorSets(OwningCommand->Handle, CurrentBindingPoint,
-    bindingTable->OwningLayout->Handle, 0, 1, sets, 0, nullptr);
+    BindTable->OwningLayout->Handle, 0, 1, sets, 0, nullptr);
 }
 
 template<class T>
 void TCmdEncoder<T>::EndEncode()
 {
+  vkEndCommandBuffer(OwningCommand->Handle);
 }
 
 VulkanRenderEncoder::VulkanRenderEncoder(VulkanCommandBuffer * pCmd)
@@ -2243,10 +2767,27 @@ void VulkanRenderEncoder::SetVertexBuffer(uint32_t slot, uint64_t offset, Buffer
 
 void VulkanRenderEncoder::DrawInstanced(const DrawInstancedDesc * drawParam)
 {
+  vkCmdDraw(OwningCommand->Handle, 
+    drawParam->vertexCountPerInstance,
+    drawParam->instanceCount,
+    drawParam->startVertexId,
+    drawParam->startInstanceId);
 }
 
 void VulkanRenderEncoder::DrawIndexedInstanced(const DrawIndexedInstancedDesc * drawParam)
 {
+  vkCmdDrawIndexed(OwningCommand->Handle,
+    drawParam->indexCountPerInstance,
+    drawParam->instanceCount,
+    drawParam->startId,
+    drawParam->baseVertexId,
+    drawParam->startInstanceId);
+}
+
+void VulkanRenderEncoder::DrawIndirect(Buffer * pIndirectBuffer, uint32_t offset, uint32_t drawCount, uint32_t stride)
+{
+  VulkanBuffer* pBuffer = static_cast<VulkanBuffer*>(pIndirectBuffer);
+  vkCmdDrawIndirect(OwningCommand->Handle, pBuffer->GetHandle(), offset, drawCount, stride);
 }
 
 void VulkanRenderEncoder::Present(Drawable * pDrawable)
@@ -2292,12 +2833,14 @@ void VulkanComputeEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 VulkanLibrary1::VulkanLibrary1(VulkanDevice * pDevice, const void * pBlobData, uint64 Size)
   : Device(pDevice)
 {
+  Device->AddInternalRef();
   Init(pBlobData, Size);
 }
 
 VulkanLibrary1::VulkanLibrary1(VulkanDevice * pDevice, const char * pFilePath)
   : Device(pDevice)
 {
+  Device->AddInternalRef();
   MemMapFile MemFile;
   if (MemFile.Open(pFilePath, IORead))
   {
@@ -2313,13 +2856,14 @@ void VulkanLibrary1::Init(const void * pBlobData, uint64 Size)
   if (pHead[0] == 'V' && pHead[1] == 'K' && pHead[2] == 'B' && pHead[3] == 'C') // Binary Version
   {
     const uint32_t* pVersion = reinterpret_cast<const uint32_t*>(pHead + 4);
+    LogPrint(Log::Info, "VulkanLibrary1", "Library Version: %d.\n", *pVersion);
     const uint32_t* pEntryCount = reinterpret_cast<const uint32_t*>(pHead + 8);
     if (*pEntryCount > 0)
     {
       int curOffset = 12;
       int szEntryInfos = *pEntryCount * sizeof(EntryInfo);
       int spirvOffset = curOffset + szEntryInfos;
-      for (int i = 0; i < *pEntryCount; i++)
+      for (uint32_t i = 0; i < *pEntryCount; i++)
       {
         const EntryInfo* pInfo = reinterpret_cast<const EntryInfo*>(pHead + curOffset);
         DataBlob[pInfo->Name].Stage = (ngfx::ShaderType)pInfo->ShaderType;
@@ -2338,6 +2882,7 @@ void VulkanLibrary1::Init(const void * pBlobData, uint64 Size)
 
 VulkanLibrary1::~VulkanLibrary1()
 {
+  Device->ReleaseInternal();
 }
 
 VulkanFunction1::VulkanFunction1(VulkanLibrary1 * pLibrary, const char * name)
@@ -2371,12 +2916,12 @@ VulkanFunction1::~VulkanFunction1()
 
 ShaderType VulkanFunction1::Type() const
 {
-  return ShaderType::Compute;
+  return ShaderType;
 }
 
 const char * VulkanFunction1::Name() const
 {
-  return nullptr;
+  return EntryName.c_str();
 }
 
 Result VulkanLibrary1::MakeFunction(const char * name, Function ** ppFunction)
@@ -2387,4 +2932,92 @@ Result VulkanLibrary1::MakeFunction(const char * name, Function ** ppFunction)
     return Result::Ok;
   }
   return Result::Failed;
+}
+
+BindTableAllocator::BindTableAllocator(VulkanDevice * pDevice)
+  : Device(pDevice)
+{
+  uint32_t MaxDescriptorSets = 16384;
+  const VkPhysicalDeviceLimits& Limits = Device->Prop.limits;
+  uint32_t Counts[] = {
+    Limits.maxDescriptorSetSamplers,
+    4096,
+    Limits.maxDescriptorSetSampledImages,
+    Limits.maxDescriptorSetStorageImages,
+    512,
+    512,
+    Limits.maxDescriptorSetUniformBuffers,
+    Limits.maxDescriptorSetStorageBuffers,
+    Limits.maxDescriptorSetUniformBuffersDynamic,
+    Limits.maxDescriptorSetStorageBuffersDynamic,
+  };
+  for (auto type : {
+    VK_DESCRIPTOR_TYPE_SAMPLER,
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+    VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+    VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
+    VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC })
+  {
+    Sizes.push_back({ type, Counts[type] });
+  }
+  VkDescriptorPoolCreateInfo PoolInfo;
+  PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+  PoolInfo.poolSizeCount = Sizes.size();
+  PoolInfo.pPoolSizes = Sizes.data();
+  PoolInfo.maxSets = MaxDescriptorSets;
+  CHECK(vkCreateDescriptorPool(Device->Handle, &PoolInfo, VULKAN_ALLOCATOR, &Handle));
+}
+
+BindTableAllocator::~BindTableAllocator()
+{
+  vkDestroyDescriptorPool(Device->Handle, Handle, VULKAN_ALLOCATOR);
+}
+
+Result BindTableAllocator::Allocate(const VulkanBindTableLayout * pLayout, BindTable ** ppTable)
+{
+  VkDescriptorSetAllocateInfo AllocInfo = { 
+    VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+  };
+  AllocInfo.descriptorPool = Handle;
+  AllocInfo.descriptorSetCount = 1;
+  AllocInfo.pSetLayouts = &pLayout->Handle;
+  VkDescriptorSet DescriptorSet = VK_NULL_HANDLE;
+  auto Ret = vkAllocateDescriptorSets(Device->Handle, &AllocInfo, &DescriptorSet);
+  // Track Usage
+  if (DescriptorSet)
+  {
+    *ppTable = new VulkanBindTable(Device, DescriptorSet);
+  }
+  return Ret == VK_SUCCESS ? 
+    Result::Ok : Result::Failed;
+}
+
+void BindTableAllocator::Free(BindTable * ppTable)
+{
+  // Remove Usage
+  vkFreeDescriptorSets(Device->Handle, Handle, 1, &(static_cast<VulkanBindTable*>(ppTable)->Handle));
+}
+
+VulkanSwapChainTexture::VulkanSwapChainTexture(VulkanSwapChain * pSwapChain, VkImage _Image, const SwapChainDesc* pDesc)
+  : Image(_Image)
+  , SwapChain(pSwapChain)
+{
+  VkImageViewCreateInfo Info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+  Info.image = Image;
+  Info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  Info.format = ConvertPixelFormatToVulkanEnum(pDesc->pixelFormat);
+  Info.components = {VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A};
+  Info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+  CHECK(vkCreateImageView(SwapChain->GetDevice()->Handle, &Info, VULKAN_ALLOCATOR, &ImageView));
+}
+
+VulkanSwapChainTexture::~VulkanSwapChainTexture()
+{
+  vkDestroyImageView(SwapChain->GetDevice()->Handle, ImageView, VULKAN_ALLOCATOR);
 }

@@ -12,24 +12,24 @@ if (WIN32)
 	add_library(ngfx_vulkan_glslang SHARED vulkan_glslang.h vulkan_glslang.cpp ${ngfx_vulkan_glslang_RC})
 	target_compile_definitions(ngfx_vulkan_glslang PRIVATE BUILD_VULKAN_GLSLANG=1)
 	target_link_libraries(ngfx_vulkan_glslang ${GLSLANG_LIBRARIES} ${SPIRV2CROSS_LIBRARY} Kaleido3D.Core)
-	set_target_properties(ngfx_vulkan_glslang PROPERTIES FOLDER "ngfx")
+	set_target_properties(ngfx_vulkan_glslang PROPERTIES FOLDER "ngfx/src")
 
-	add_library(ngfx_vulkan SHARED ${NGFX_HEADER} ${NGFX_YML} ${ngfx_vulkan_RC} vulkan.cpp)
+	add_library(ngfx_vulkan SHARED 
+        ${NGFX_HEADER} ${NGFX_YML} 
+        ${ngfx_vulkan_RC} vulkan.cpp 
+        ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/generator/gen.py
+    )
 	target_compile_definitions(ngfx_vulkan PRIVATE BUILD_SHARED_LIB=1)
 
 	add_library(ngfxu SHARED ngfx.h ngfxu.h ngfxu.cpp ${ngfxu_RC})
-	set_target_properties(ngfxu PROPERTIES FOLDER "ngfx")
-
-	add_executable(ngfx_vulkan_shader_archive vulkan_glslang.h vk_shader_archive.cpp ${ngfx_vulkan_glslang_RC})
-	target_link_libraries(ngfx_vulkan_shader_archive ngfx_vulkan_glslang)
-	set_target_properties(ngfx_vulkan_shader_archive PROPERTIES FOLDER "ngfx/tools")
+	set_target_properties(ngfxu PROPERTIES FOLDER "ngfx/src")
 
 	add_custom_command(TARGET ngfx_vulkan PRE_BUILD COMMAND
 		${PYTHON_EXECUTABLE} ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/run.py -o 
 		${NGFX_HEADER} ${NGFX_YML})
 
 	target_link_libraries(ngfx_vulkan Kaleido3D.Core ngfx_vulkan_glslang ${VULKAN_LIB})
-	set_target_properties(ngfx_vulkan PROPERTIES FOLDER "ngfx")
+	set_target_properties(ngfx_vulkan PROPERTIES FOLDER "ngfx/src")
 elseif(MACOS)
 	add_library(ngfx_metal SHARED metal.cpp)
 	add_library(ngfxu SHARED ngfx.h ngfxu.h ngfxu.cpp)
@@ -38,8 +38,8 @@ elseif(MACOS)
 		${PYTHON_EXECUTABLE} ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/run.py -o 
 		${NGFX_HEADER} ${NGFX_YML})
 
-	set_target_properties(ngfx_metal PROPERTIES FOLDER "ngfx")
-	set_target_properties(ngfxu PROPERTIES FOLDER "ngfx")
+	set_target_properties(ngfx_metal PROPERTIES FOLDER "ngfx/src")
+	set_target_properties(ngfxu PROPERTIES FOLDER "ngfx/src")
 	target_link_libraries(ngfx_metal Kaleido3D.Core "-framework Metal")
   
 elseif(ANDROID)

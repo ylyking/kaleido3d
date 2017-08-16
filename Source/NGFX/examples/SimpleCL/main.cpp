@@ -128,39 +128,30 @@ int main()
   device->CreateFence(fence.GetAddressOf());
   fence->SetName("DefaultFence");
 
-  Ptr<Compiler> compiler;
-  factory->CreateCompiler(ngfx::ShaderLang::HLSL, compiler.GetAddressOf());
-
   void* pData = nullptr;
   uint32_t szData = 0;
   LoadSpv("../../Data/Test/SimpleCL.spv", &pData, &szData);
-
-  Ptr<Reflection> reflect;
-  compiler->Reflect(pData, szData, reflect.GetAddressOf());
-  uint32_t numStorageBuffer = reflect->VariableCount();
-
-  Ptr<Function> function;
-  ShaderOption shaderOpt = { ShaderType::Compute, ShaderLang::HLSL, "main", ShaderProfile::SM5, ShaderFormat::Text };
-  compiler->Compile(&shaderOpt, nullptr, 0, function.GetAddressOf());
 
   Ptr<PipelineLayout> pipelineLayout;
   PipelineLayoutDesc pipelineLayoutDesc = {};
   device->CreatePipelineLayout(&pipelineLayoutDesc, pipelineLayout.GetAddressOf());
 
-  Ptr<BindingTable> argTable;
-  pipelineLayout->CreateBindingTable(argTable.GetAddressOf());
+  Ptr<BindTable> argTable;
+  pipelineLayout->CreateBindTable(argTable.GetAddressOf());
 
   Ptr<Pipeline> computePipeline;
   device->CreateComputePipeline(nullptr, pipelineLayout.Get(), computePipeline.GetAddressOf());
 
   argTable->SetBuffer(0, ShaderType::Compute, bufferView.Get());
 
-  Ptr<CommandBuffer> commandBuffer = Ptr<CommandBuffer>(queue->CommandBuffer());
-  Ptr<ComputeCommandEncoder> computeCommand = Ptr<ComputeCommandEncoder>(commandBuffer->ComputeCommandEncoder());
-  computeCommand->SetPipeline(computePipeline.Get());
-  computeCommand->SetBindingTable(argTable.Get());
-  computeCommand->Dispatch(1024, 1024, 1);
-  computeCommand->EndEncode();
+  Ptr<CommandBuffer> commandBuffer;
+  Ptr<ComputeCommandEncoder> computeEncoder;
+  queue->CreateCommandBuffer(commandBuffer.GetAddressOf());
+  commandBuffer->CreateComputeCommandEncoder(computeEncoder.GetAddressOf());
+  computeEncoder->SetPipeline(computePipeline.Get());
+  computeEncoder->SetBindTable(argTable.Get());
+  computeEncoder->Dispatch(1024, 1024, 1);
+  computeEncoder->EndEncode();
   commandBuffer->Commit(fence.Get());
 
   return 0;

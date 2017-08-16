@@ -27,6 +27,7 @@ EShLanguage ConvertShaderTypeToGlslangEnum(ngfx::ShaderType const& e) {
   case ShaderType::TessailationControl:
     return EShLangTessControl;
   }
+  return EShLangCount;
 }
 
 ShaderType ConvertGlslangEnum(EShLanguage const& e) {
@@ -44,6 +45,7 @@ ShaderType ConvertGlslangEnum(EShLanguage const& e) {
   case EShLangTessControl:
     return ShaderType::TessailationControl;
   }
+  return ShaderType::Vertex;
 }
 
 void sInitializeGlSlang()
@@ -383,7 +385,7 @@ ngfx::Result CompileFromSource(const ngfx::CompileOption & Opt, const char * pSo
   return Result::Ok;
 }
 
-ngfx::Result ReflectFromSPIRV(ByteCode const & bc, ngfx::Reflection ** ppResult)
+ngfx::Result ReflectFromSPIRV(ByteCode const & bc, ngfx::PipelineReflection ** ppResult)
 {
   *ppResult = new SPIRVCrossReflection(bc);
   return Result::Ok;
@@ -431,4 +433,5 @@ ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path)
     ArchLib.ArrayIn(pair.second.ByteCode.data(), pair.second.ByteCode.size());
   }
   OutputLib.Close();
+  return Result::Ok;
 }
