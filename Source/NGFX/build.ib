@@ -1,0 +1,41 @@
+cproj("vkNGFX") {
+    type = "shared_lib"
+    srcs = [
+        "Public/**.h",
+        "Private/ShaderLab/**.cpp",
+        "Private/ShaderFormats/**.cpp",
+        "Private/ShaderCompiler/**.cpp",
+        "../../Tools/RHIGenerator/ngfx.yml"
+    ]
+    match($target_os) {
+        "windows" | "android" | "linux" => {
+            srcs += "Private/Vulkan/vulkan.cpp"
+            srcs += "Private/Vulkan/volk.c"
+            srcs += "Private/Vulkan/volk.h"
+        }
+    }
+    srcs = list_files(srcs)
+    private = {
+        inc_dirs = ["Public", "../Core"]
+    }
+    link_targets = ["vulkan", "kCore"]
+}
+cproj("dx12NGFX") {
+    type = "shared_lib"
+    srcs = [
+        "Public/**.h",
+        "Private/ShaderLab/**.cpp",
+        "Private/ShaderFormats/**.cpp",
+        "Private/ShaderCompiler/**.cpp"
+    ]
+    match($target_os) {
+        "windows" => {
+            srcs += "Private/D3D12/d3d12.cpp"
+        }
+    }
+    srcs = list_files(srcs)
+    private = {
+        inc_dirs = ["Public"]
+    }
+    link_targets = ["vulkan", "kCore"]
+}
