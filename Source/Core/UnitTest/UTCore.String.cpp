@@ -49,6 +49,9 @@ void TestString()
 	auto d64 = Base64Decode(b64);
 	cout << "d64:" << d64.CStr() << endl;
 
+    cout << "Sub(3,4):" << d64.SubStr(3, 4).CStr() << endl;
+    cout << d64.FindLastOf('r') << endl;
+    cout << d64.FindLastOf('x') << endl;
 }
 
 int main(int argc, char**argv)

@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -507,7 +508,21 @@ TextureImpl::CreateViewForSwapchainImage()
     vkCreateImageView(NativeDevice(), &m_ImageViewInfo, nullptr, &m_ResView));
 }
 
-VkImageCreateInfo ConvertFromTextureDesc(NGFXResourceDesc const& ResDesc)
+
+template<typename PipelineSubType>
+VkPipelineShaderStageCreateInfo TPipelineState<PipelineSubType>::ConvertStageInfoFromShaderBundle(
+        NGFXShaderBundle const& Bundle)
+{
+  return { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+           nullptr,
+           0,
+           g_ShaderType[Bundle.Desc.Stage],
+           m_Device->CreateShaderModule(Bundle),
+           Bundle.Desc.EntryFunction.CStr() };
+}
+
+
+        VkImageCreateInfo ConvertFromTextureDesc(NGFXResourceDesc const& ResDesc)
 {
   auto Desc = ResDesc.TextureDesc;
   VkImageCreateInfo Info =
@@ -2801,10 +2816,27 @@ SwapChainImpl::InitSurface(void* WindowHandle)
   SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
   SurfaceCreateInfo.window = (ANativeWindow*)WindowHandle;
   K3D_VK_VERIFY(
-    vkCreateAndroidSurfaceKHR(GetGpuRef()->GetInstance()->m_Instance,
+    vkCreateAndroidSurfaceKHR(m_Device->m_Gpu->GetInstance()->m_Instance,
       &SurfaceCreateInfo,
       nullptr,
       &m_Surface));
+#elif K3DPLATFORM_OS_LINUX
+  struct Handle
+  {
+      ::Display*      Display;
+      ::Window        Window;
+  };
+
+  VkXlibSurfaceCreateInfoKHR SurfaceCreateInfo = {};
+  SurfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+  SurfaceCreateInfo.dpy = reinterpret_cast<Handle*>(WindowHandle)->Display;
+  SurfaceCreateInfo.window = reinterpret_cast<Handle*>(WindowHandle)->Window;
+  K3D_VK_VERIFY(
+  vkCreateXlibSurfaceKHR(m_Device->m_Gpu->GetInstance()->m_Instance,
+                         &SurfaceCreateInfo,
+                         nullptr,
+                         &m_Surface)
+  );
 #endif
 }
 
@@ -3324,10 +3356,10 @@ DeviceImpl::QueryTextureSubResourceLayout(NGFXTextureRef resource,
     &SubRes, (VkSubresourceLayout*)layout);
 }
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #define PLATFORM_SURFACE_EXT VK_KHR_WIN32_SURFACE_EXTENSION_NAME
 #elif defined(K3DPLATFORM_OS_LINUX) && !defined(K3DPLATFORM_OS_ANDROID)
-#define PLATFORM_SURFACE_EXT VK_KHR_XCB_SURFACE_EXTENSION_NAME
+#define PLATFORM_SURFACE_EXT VK_KHR_XLIB_SURFACE_EXTENSION_NAME
 #elif defined(K3DPLATFORM_OS_ANDROID)
 #define PLATFORM_SURFACE_EXT VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
 #endif

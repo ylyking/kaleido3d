@@ -46,7 +46,7 @@ namespace k3d
 	}
 
 	AppStatus App::Run() {
-#if K3DPLATFORM_OS_WIN || K3DPLATFORM_OS_MAC
+#if K3DPLATFORM_OS_WIN || K3DPLATFORM_OS_MAC || K3DPLATFORM_OS_LINUX
 		if (!m_Window) 
 			return AppStatus::UnInitialized;
 
@@ -79,15 +79,6 @@ namespace k3d
 		return AppStatus::Destroyed;
 	}
 
-	const kString Environment::ENV_KEY_LOG_DIR		= KT("Log_Dir");
-	const kString Environment::ENV_KEY_MODULE_DIR	= KT("Module_Dir");
-	const kString Environment::ENV_KEY_APP_NAME 	= KT("App_Name");
-
-	Environment::Environment() { }
-	Environment::~Environment() { }
-
-	std::map<kString, kString> lEnvVars;
-
 #if K3DPLATFORM_OS_ANDROID
 	void Environment::__init__(JNIEnv *_env, jobject _context, jstring appName, jstring path, AAssetManager *asset)
 	{
@@ -95,8 +86,8 @@ namespace k3d
 		this->context 	= _context;
 		this->assets 	= asset;
 		jboolean isCopy;
-		lEnvVars[Environment::ENV_KEY_MODULE_DIR] = env->GetStringUTFChars(path, &isCopy);
-		lEnvVars[Environment::ENV_KEY_APP_NAME] = env->GetStringUTFChars(appName, &isCopy);
+		//lEnvVars[Environment::ENV_KEY_MODULE_DIR] = env->GetStringUTFChars(path, &isCopy);
+		//lEnvVars[Environment::ENV_KEY_APP_NAME] = env->GetStringUTFChars(appName, &isCopy);
 	}
 #endif
 
@@ -106,58 +97,6 @@ namespace k3d
 	{
 		return &gEnv;
 	}
-
-	kString Environment::GetEnvValue(const kString &var)
-	{
-		if (lEnvVars.find(var) == lEnvVars.end())
-		{
-			return KT("");
-		}
-		return lEnvVars[var];
-	}
-
-#if K3DPLATFORM_OS_WIN
-		std::wstring s_ModulePath = L"";
-		void GetModulePath(IN HMODULE hModule, IN OUT LPWSTR lpPathBuffer, IN DWORD nSize);
-
-		App* Init(kString const & appName)
-		{
-			if (s_ModulePath == KT("")) 
-			{
-				WCHAR path[2048] = { 0 };
-				GetModulePath(NULL, path, 2048);
-				s_ModulePath = path;
-			}
-			return nullptr;
-		}
-#endif
-
-#if K3DPLATFORM_OS_WIN
-		void GetModulePath(IN HMODULE hModule, IN OUT LPWSTR lpPathBuffer, IN DWORD nSize) {
-			wchar_t *p, *q;
-			p = (wchar_t*)calloc(nSize, sizeof(char));
-			GetModuleFileNameW(hModule, p, nSize);
-			q = p;
-			while (wcschr(q, '\\'))
-			{
-				q = wcschr(q, '\\');
-				q++;
-			}
-			*--q = '\0';
-			wcscpy_s(lpPathBuffer, nSize, p);
-		}
-
-		kString GetExecutablePath() {
-			if (s_ModulePath.empty()) {
-				WCHAR path[2048] = { 0 };
-				GetModulePath(NULL, path, 2048);
-				s_ModulePath = path;
-			}
-			return s_ModulePath;
-			//            NSString * pPath = [[NSBundle mainBundle] executablePath];
-			//            return [pPath utf8String];
-		}
-#endif
 
 		void RegisterApp()
 		{
@@ -195,42 +134,30 @@ namespace k3d
 			[menubar addItem : appMenuItem];
 			[NSApp setMainMenu : menubar];
             
-            NSBundle* bundle = [NSBundle mainBundle];
-            NSString* path = [[NSString alloc] initWithString:[bundle builtInPlugInsPath]];
-            lEnvVars[Environment::ENV_KEY_MODULE_DIR] = [path UTF8String];
-            [path release];
-            path = [[NSString alloc] initWithString:[bundle bundlePath]];
-            lEnvVars[Environment::ENV_KEY_LOG_DIR] = kString([path UTF8String]) + "/Logs";
-            [path release];
-            path = [[NSString alloc] initWithString:[bundle executablePath]];
-            kString exePath = [path UTF8String];
-            size_t sepPos = exePath.find_last_of("/");
-            lEnvVars[Environment::ENV_KEY_APP_NAME] = exePath.substr(sepPos+1, exePath.length()-sepPos);
-            [path release];
-#elif K3DPLATFORM_OS_WIN
-			wchar_t szFileName[MAX_PATH];
-			GetModuleFileNameW(NULL, szFileName, MAX_PATH);
-			kString exeFilePath = szFileName;
-			size_t pos = exeFilePath.find_last_of(KT("\\"));
-			size_t nPos = exeFilePath.find_last_of(KT(".exe"));
-			if (pos != kString::npos)
-			{
-				lEnvVars[Environment::ENV_KEY_MODULE_DIR] = exeFilePath.substr(0, pos);
-				lEnvVars[Environment::ENV_KEY_APP_NAME] = exeFilePath.substr(pos+1, nPos - pos - 4);
-			}
-			else
-			{
-				lEnvVars[Environment::ENV_KEY_MODULE_DIR] = KT("./");
-				lEnvVars[Environment::ENV_KEY_APP_NAME] = exeFilePath.substr(0, nPos - 4);
-			}
-			lEnvVars[Environment::ENV_KEY_LOG_DIR] = lEnvVars[Environment::ENV_KEY_MODULE_DIR];
+#elif K3DPLATFORM_OS_WIN/*
+            char szFileName[MAX_PATH];
+            GetModuleFileNameA(NULL, szFileName, MAX_PATH);
+            kString exeFilePath = szFileName;
+            size_t pos = exeFilePath.find_last_of(KT("\\"));
+            size_t nPos = exeFilePath.find_last_of(KT(".exe"));
+            if (pos != kString::npos)
+            {
+                lEnvVars[Environment::ENV_KEY_MODULE_DIR] = exeFilePath.substr(0, pos);
+                lEnvVars[Environment::ENV_KEY_APP_NAME] = exeFilePath.substr(pos+1, nPos - pos - 4);
+            }
+            else
+            {
+                lEnvVars[Environment::ENV_KEY_MODULE_DIR] = "./";
+                lEnvVars[Environment::ENV_KEY_APP_NAME] = exeFilePath.substr(0, nPos - 4);
+            }
+            lEnvVars[Environment::ENV_KEY_LOG_DIR] = lEnvVars[Environment::ENV_KEY_MODULE_DIR];*/
 #elif K3DPLATFORM_OS_IOS
             lEnvVars[Environment::ENV_KEY_MODULE_DIR] = KT("./");
             //lEnvVars[Environment::ENV_KEY_LOG_DIR] = KT("./");
 #endif
 		}
 
-		uint32 RunApplication(App & app, kString const & appName)
+		uint32 RunApplication(App & app, String const & appName)
 		{
 			app.OnInit();
 			return (uint32) app.Run();

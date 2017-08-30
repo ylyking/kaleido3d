@@ -1,5 +1,18 @@
 #include_directories(${RAPIDJSON_INCLUDE_DIR})
 
+
+set(SRC_CAMERA			Assets/CameraData.h Assets/CameraData.cpp)
+set(SRC_MESH			Assets/MeshData.h Assets/MeshData.cpp Assets/ObjectMesh.h Assets/ObjectMesh.cpp Assets/RiggedMeshData.h Assets/RiggedMeshData.cpp)
+set(SRC_IMAGE			Assets/ImageData.h Assets/ImageData.cpp)
+set(SRC_BUNDLE	        Assets/Bundle.h Assets/Bundle.cpp)
+
+source_group(Asset				FILES ${SRC_BUNDLE})
+source_group("Asset\\Mesh"		FILES ${SRC_MESH})
+source_group("Asset\\Camera"	FILES ${SRC_CAMERA})
+source_group("Asset\\Image"		FILES ${SRC_IMAGE})
+
+set(ASSET_SRCS ${SRC_BUNDLE} ${SRC_CAMERA} ${SRC_MESH} ${SRC_IMAGE})
+
 set(ENGINE_SRCS
 	Engine.h
 	Engine.cpp
@@ -89,6 +102,7 @@ SRCS
 	${ENGINE_SRCS}
 	${MAT_SRCS}
 	${PARAM_SRCS} 
+    ${ASSET_SRCS}
 LIBS 
 	Kaleido3D.Core 
 FOLDER 

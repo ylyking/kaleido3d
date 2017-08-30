@@ -1,4 +1,6 @@
 #include "Kaleido3D.h"
+#include "Core/App.h"
+#include "Core/Os.h"
 #include "Core/Window.h"
 #include "Core/Message.h"
 #include "Core/LogUtil.h"
@@ -7,6 +9,47 @@
 
 namespace k3d
 {
+    struct EnvironmentImpl
+    {
+        String InstanceName;
+        String ExecutableDir;
+        String DataDir;
+
+        EnvironmentImpl()
+            : InstanceName(64)
+            , ExecutableDir(400)
+            , DataDir(400)
+        {
+            String FileName(512);
+            GetModuleFileNameA(NULL, (LPSTR)FileName.Data(), 512);
+            FileName.ReCalculate();
+            auto Pos = FileName.FindLastOf('.');
+            auto BeginPos = FileName.FindLastOf('\\');
+            InstanceName = FileName.SubStr(BeginPos + 1, Pos - BeginPos - 1);
+            ExecutableDir = FileName.SubStr(0, BeginPos);
+            
+
+            WIN32_FIND_DATAA ffd;
+            HANDLE hFind = FindFirstFileA(Os::Path::Join(ExecutableDir, "Data").CStr(), &ffd);
+            String CurrentPath = ExecutableDir;
+            while (INVALID_HANDLE_VALUE == hFind)
+            {
+                auto NewPos = CurrentPath.FindLastOf('\\');
+                if (NewPos == String::npos)
+                {
+                    DataDir = ".";
+                    break;
+                }
+                CurrentPath = CurrentPath.SubStr(0, NewPos);
+                String FindPath = Os::Path::Join(CurrentPath, "Data");
+                hFind = FindFirstFileA(FindPath.CStr(), &ffd);
+                if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                    DataDir = FindPath;
+                    break;
+                }
+            }
+        }
+    };
 	namespace WindowImpl
 	{
 		namespace Global {
@@ -684,10 +727,38 @@ namespace k3d
 		}
 	}
 
-
-
 	IWindow::Ptr MakePlatformWindow(const char *windowName, int width, int height)
 	{
 		return MakeShared<WindowImpl::WindowsWindow>(windowName, width, height);
 	}
+
+    Environment::Environment() 
+    {
+        d = new EnvironmentImpl;
+    }
+
+    Environment::~Environment() 
+    {
+        delete d;
+    }
+
+    String Environment::GetLogDir() const
+    {
+        return d->ExecutableDir;
+    }
+
+    String Environment::GetModuleDir() const
+    {
+        return d->ExecutableDir;
+    }
+
+    String Environment::GetDataDir()const
+    {
+        return d->DataDir;
+    }
+
+    String Environment::GetInstanceName() const
+    {
+        return d->InstanceName;
+    }
 }

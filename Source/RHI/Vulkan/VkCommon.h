@@ -3,6 +3,7 @@
 #pragma once
 
 #include <Kaleido3D.h>
+#include <Config/OSHeaders.h>
 #include <Math/kMath.hpp>
 #include <RHI/Vulkan/Private/DynVulkanLoader.h>
 #include <Interface/IRHI.h>

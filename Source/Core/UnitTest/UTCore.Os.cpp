@@ -27,8 +27,8 @@ private:
 
 void TestOs()
 {
-	K3D_ASSERT(Os::MakeDir(KT("./TestOs")));
-	K3D_ASSERT(Os::Remove(KT("./TestOs")));
+	K3D_ASSERT(Os::Path::MakeDir(("./TestOs")));
+	K3D_ASSERT(Os::Path::Remove(("./TestOs")));
 	
   auto CpuUsageThr = MakeSharedMacro(Os::Thread, []()
   {

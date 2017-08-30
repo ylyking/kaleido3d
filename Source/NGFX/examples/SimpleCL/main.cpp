@@ -5,79 +5,6 @@ SimpleCL SPIRV & OpenCL
 #include <ngfx.h>
 #include <Core/Os.h>
 
-#ifdef REFLECTION
-enum class ArgumentAccess
-{
-  Write = 1,
-  Read = 2,
-};
-
-enum class ArgumentType
-{
-  Buffer,
-  Texture,
-  Sampler,
-  ThreadGroupMemory
-};
-
-enum DataType
-{
-  None,
-  Struct,
-  Array,
-  Pointer,
-  Sampler,
-  Texture,
-  Floatx,
-};
-
-struct StructMember
-{
-  char name[64];
-  uint32_t offset;
-  DataType dataType;
-};
-
-struct StructType
-{
-  StructMember members[1];
-  StructMember membderByName;
-};
-
-struct PointerType
-{
-  enum {
-
-  };
-  uint32_t alignment;
-  uint32_t dataSize;
-  DataType elementType;
-  bool isArgumentBuffer;
-};
-
-struct Argument
-{
-  char name[128];
-  ArgumentAccess access;
-  uint32_t index;
-  ArgumentType type;
-  union
-  {
-    struct {
-      uint32_t bufferAlign;
-      uint32_t dataSize;
-      DataType dataType;
-      // struct Type
-    } buffer;
-    struct {
-      DataType textureType;
-
-    };
-  };
-};
-
-#endif
-
 #if _WIN32
 #pragma comment(linker,"/subsystem:console")
 #endif
@@ -130,17 +57,22 @@ int main()
 
   void* pData = nullptr;
   uint32_t szData = 0;
+  // clspv --vkbc
   LoadSpv("../../Data/Test/SimpleCL.spv", &pData, &szData);
+
+  Ptr<Library> library;
+  device->CreateLibrary(new CompileOption, pData, szData, library.GetAddressOf());
+  Ptr<Function> clFunction;
+  library->MakeFunction("main", clFunction.GetAddressOf());
 
   Ptr<PipelineLayout> pipelineLayout;
   PipelineLayoutDesc pipelineLayoutDesc = {};
   device->CreatePipelineLayout(&pipelineLayoutDesc, pipelineLayout.GetAddressOf());
 
   Ptr<BindTable> argTable;
-  pipelineLayout->CreateBindTable(argTable.GetAddressOf());
-
   Ptr<Pipeline> computePipeline;
-  device->CreateComputePipeline(nullptr, pipelineLayout.Get(), computePipeline.GetAddressOf());
+  Ptr<PipelineReflection> reflection;
+  device->CreateComputePipeline(clFunction.Get(), computePipeline.GetAddressOf(), reflection.GetAddressOf());
 
   argTable->SetBuffer(0, ShaderType::Compute, bufferView.Get());
 

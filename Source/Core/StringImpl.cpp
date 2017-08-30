@@ -19,7 +19,7 @@ static const char* base64_chars =
 "abcdefghijklmnopqrstuvwxyz"
 "0123456789+/";
 
-K3D_API K3D_API String Base64Encode(String const & in)
+K3D_API String Base64Encode(String const & in)
 {
 	auto in_len = in.Length();
 	auto bytes_to_encode = in.CStr();

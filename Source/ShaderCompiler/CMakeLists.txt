@@ -17,7 +17,7 @@ source_group("Compiler\\Public" FILES ${PUB_SRCS})
 add_plugin(ShaderCompiler 
 	FOLDER "Runtime/Tools"
 	SRCS ${COMPILER_SRCS} ${PUB_SRCS}
-    LIBS ${GLSLANG_LIBRARIES} ${SPIRV2CROSS_LIBRARY})
+    LIBS ${GLSLANG_LIBRARIES} ${SPIRVCROSS_LIBRARIES})
 
 if(MACOS AND BUILD_SHARED)
     add_custom_command(TARGET ShaderCompiler POST_BUILD COMMAND

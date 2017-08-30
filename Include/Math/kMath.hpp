@@ -14,6 +14,7 @@
 #include "kTypeTrait.hpp"
 #include "../Kaleido3D.h"
 #include "../Config/OSHeaders.h"
+#include <string.h>
 
 #if K3DCOMPILER_CLANG || K3DCOMPILER_GCC
 #include <cmath>

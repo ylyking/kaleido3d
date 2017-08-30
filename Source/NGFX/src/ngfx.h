@@ -231,6 +231,7 @@ typedef enum ngfxTextureDimension
   NGFX_TEXTURE_DIMENSION_TEX3D,
   NGFX_TEXTURE_DIMENSION_TEX3D_ARRAY,
   NGFX_TEXTURE_DIMENSION_TEXCUBE,
+  NGFX_TEXTURE_DIMENSION_BUFFER,
 } ngfxTextureDimension;
 
 typedef enum ngfxFillMode
@@ -381,6 +382,7 @@ typedef enum ngfxDataType
   NGFX_DATA_TYPE_ARRAY,
   NGFX_DATA_TYPE_POINTER,
   NGFX_DATA_TYPE_TEXTURE,
+  NGFX_DATA_TYPE_SAMPLER,
   NGFX_DATA_TYPE_BOOL,
   NGFX_DATA_TYPE_BOOL2,
   NGFX_DATA_TYPE_BOOL3,
@@ -413,8 +415,7 @@ typedef enum ngfxArgumentAccess
   NGFX_ARGUMENT_ACCESS_WRITE_ONLY = 2,
 } ngfxArgumentAccess;
 
-typedef struct _ngfxBindTableLayoutInitializer* ngfxBindTableLayoutInitializer;
-typedef struct _ngfxBindTableLayout* ngfxBindTableLayout;
+typedef struct _ngfxBindTableEncoder* ngfxBindTableEncoder;
 typedef struct _ngfxSwapChain* ngfxSwapChain;
 typedef struct _ngfxFunction* ngfxFunction;
 typedef struct _ngfxLibrary* ngfxLibrary;
@@ -621,7 +622,7 @@ struct ngfxShaderBinding
 // Description of Pipeline Layout (How to layout bindings)
 struct ngfxPipelineLayoutDesc
 {
-  const ngfxBindTableLayout * pShaderLayout;
+  const ngfxBindTableEncoder * pTableEncoders;
   uint32_t shaderLayoutCount;
 };
 
@@ -707,6 +708,17 @@ struct ngfxShaderOption
   const char * entryName;
   ngfxShaderProfile profile;
   ngfxShaderFormat format;
+};
+
+struct ngfxArgumentDesc
+{
+  ngfxDataType dataType;
+  int32_t index;
+  ngfxArgumentAccess access;
+  int32_t arrayLength;
+  ngfxTextureDimension textureDim;
+  int32_t bufferAlignment;
+  ngfxShaderStageBit stage;
 };
 
 struct ngfxCompileOption
@@ -888,8 +900,18 @@ public:
   {
     return EnumAsUint32<TEnum>(~Value);
   }
+  operator TEnum() const
+  {
+      return static_cast<TEnum>(Value);
+  }
   uint32_t Value;
 };
+
+template <typename TEnum>
+inline bool operator == (const EnumAsUint32<TEnum>& Lhs, TEnum const& Rhs)
+{
+    return Lhs.Value == static_cast<uint32_t>(Rhs);
+}
 
 template <typename TEnum>
 inline bool operator & (const EnumAsUint32<TEnum>& Lhs, const TEnum& Rhs)
@@ -1071,6 +1093,7 @@ enum class TextureDimension : uint32_t
   Tex3D,
   Tex3DArray,
   TexCube,
+  Buffer,
 };// Enum TextureDimension
 
 enum class FillMode : uint32_t
@@ -1221,6 +1244,7 @@ enum class DataType : uint32_t
   Array,
   Pointer,
   Texture,
+  Sampler,
   Bool,
   Bool2,
   Bool3,
@@ -1253,8 +1277,7 @@ enum class ArgumentAccess : uint32_t
   WriteOnly = 2,
 };// Enum ArgumentAccess
 
-struct BindTableLayoutInitializer;
-struct BindTableLayout;
+struct BindTableEncoder;
 struct SwapChain;
 struct Function;
 struct Library;
@@ -2196,17 +2219,17 @@ static_assert(sizeof(ShaderBinding) == sizeof(ngfxShaderBinding), "ShaderBinding
 // Description of Pipeline Layout (How to layout bindings)
 struct PipelineLayoutDesc
 {
-  const BindTableLayout * pShaderLayout;
+  const BindTableEncoder * pTableEncoders;
   uint32_t shaderLayoutCount;
 
-  PipelineLayoutDesc(const BindTableLayout * _pShaderLayout = nullptr, uint32_t _shaderLayoutCount = 0)
-  : pShaderLayout(_pShaderLayout)
+  PipelineLayoutDesc(const BindTableEncoder * _pTableEncoders = nullptr, uint32_t _shaderLayoutCount = 0)
+  : pTableEncoders(_pTableEncoders)
   , shaderLayoutCount(_shaderLayoutCount)
   {  }
 
-  PipelineLayoutDesc& SetPShaderLayout(const BindTableLayout * _pShaderLayout)
+  PipelineLayoutDesc& SetPTableEncoders(const BindTableEncoder * _pTableEncoders)
   {
-    pShaderLayout = _pShaderLayout;
+    pTableEncoders = _pTableEncoders;
     return *this;
   }
 
@@ -2606,6 +2629,71 @@ struct ShaderOption
 
 static_assert(sizeof(ShaderOption) == sizeof(ngfxShaderOption), "ShaderOption & ngfxShaderOption Size Not Equal!");
 
+struct ArgumentDesc
+{
+  DataType dataType;
+  int32_t index;
+  EnumAsUint32<ArgumentAccess> access;
+  int32_t arrayLength;
+  TextureDimension textureDim;
+  int32_t bufferAlignment;
+  EnumAsUint32<ShaderStageBit> stage;
+
+  ArgumentDesc(DataType _dataType = DataType::None, int32_t _index = 0, ArgumentAccess _access = ArgumentAccess::ReadOnly, int32_t _arrayLength = 0, TextureDimension _textureDim = TextureDimension::Tex1D, int32_t _bufferAlignment = 0, ShaderStageBit _stage = ShaderStageBit::Vertex)
+  : dataType(_dataType)
+  , index(_index)
+  , access(_access)
+  , arrayLength(_arrayLength)
+  , textureDim(_textureDim)
+  , bufferAlignment(_bufferAlignment)
+  , stage(_stage)
+  {  }
+
+  ArgumentDesc& SetDataType(DataType _dataType)
+  {
+    dataType = _dataType;
+    return *this;
+  }
+
+  ArgumentDesc& SetIndex(int32_t _index)
+  {
+    index = _index;
+    return *this;
+  }
+
+  ArgumentDesc& SetAccess(ArgumentAccess _access)
+  {
+    access = _access;
+    return *this;
+  }
+
+  ArgumentDesc& SetArrayLength(int32_t _arrayLength)
+  {
+    arrayLength = _arrayLength;
+    return *this;
+  }
+
+  ArgumentDesc& SetTextureDim(TextureDimension _textureDim)
+  {
+    textureDim = _textureDim;
+    return *this;
+  }
+
+  ArgumentDesc& SetBufferAlignment(int32_t _bufferAlignment)
+  {
+    bufferAlignment = _bufferAlignment;
+    return *this;
+  }
+
+  ArgumentDesc& SetStage(ShaderStageBit _stage)
+  {
+    stage = _stage;
+    return *this;
+  }
+};
+
+static_assert(sizeof(ArgumentDesc) == sizeof(ngfxArgumentDesc), "ArgumentDesc & ngfxArgumentDesc Size Not Equal!");
+
 struct CompileOption
 {
   Bool32 stripDebugSymbols;
@@ -2655,16 +2743,9 @@ struct CompileOption
 
 static_assert(sizeof(CompileOption) == sizeof(ngfxCompileOption), "CompileOption & ngfxCompileOption Size Not Equal!");
 
-struct BindTableLayoutInitializer : public RefCounted<false>
+struct BindTableEncoder : public RefCounted<false>
 {
-  virtual void AddBuffer(uint32_t slot, uint32_t count, ShaderStageBit visibility) = 0;
-  virtual void AddTexture(uint32_t slot, uint32_t count, ShaderStageBit visibility) = 0;
-  virtual void AddSampler(uint32_t slot, ShaderStageBit visibility) = 0;
-  virtual Result Initialize(BindTableLayout ** ppBindTableLayout) = 0;
-};
-
-struct BindTableLayout : public RefCounted<false>
-{
+  virtual Result Allocate(BindTable ** ppBindTable) = 0;
 };
 
 // Present drawables
@@ -2702,6 +2783,7 @@ struct Variable : public RefCounted<false>
   virtual VariableType * Type() = 0;
   virtual uint32_t Index() = 0;
   virtual bool Active() = 0;
+  virtual ShaderType GetStage() const = 0;
 };
 
 // Not ready yet
@@ -2738,7 +2820,7 @@ struct PipelineReflection : public RefCounted<false>
 {
   virtual uint32_t VariableCount() const = 0;
   virtual Variable * VariableAt(uint32_t id) const = 0;
-  virtual ShaderType GetStage() const = 0;
+  virtual Result Merge(const PipelineReflection * pReflection) = 0;
 };
 
 // Create devices and swapchains
@@ -2781,7 +2863,6 @@ struct RenderPipeline : public Pipeline
 
 struct PipelineLayout : public NamedObject<false>
 {
-  virtual Result CreateBindTable(BindTable ** ppBindingTable) = 0;
 };
 
 // Shader binding table
@@ -2833,13 +2914,11 @@ struct Device : public NamedObject<true>
 {
   virtual void GetDesc(NotNull DeviceDesc * pDesc) = 0;
   virtual Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) = 0;
-  virtual void CreateBindTableLayoutInitializer(NotNull BindTableLayoutInitializer ** ppBTLInitializer) = 0;
   virtual Result CreatePipelineLayout(NotNull const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) = 0;
-  virtual Result CreateBindTable(NotNull const BindTableLayout * pBindTableLayout, BindTable ** ppBindingTable) = 0;
-  virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable PipelineLayout * pPipelineLayout, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState) = 0;
+  virtual Result MakeBindTableEncoder(NotNull const ArgumentDesc * pArgumentDescs, int32_t argumentCount, BindTableEncoder ** ppBindingTableLayout) = 0;
   virtual Result CreateRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, Nullable RenderPass * pRenderPass, Pipeline ** pPipelineState, NotNull PipelineReflection ** ppReflection) = 0;
-  virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Nullable PipelineLayout * pPipelineLayout, Pipeline ** ppPipeline) = 0;
   virtual Result CreateComputePipeline(NotNull Function * pComputeFunction, Pipeline ** ppPipeline, NotNull PipelineReflection ** ppReflection) = 0;
+  virtual Result CreateComputePipeline(NotNull const Function * pComputeFunction, NotNull const PipelineLayout * ppPipelineLayout, NotNull Pipeline ** ppPipeline) = 0;
   virtual Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) = 0;
   virtual Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) = 0;
   virtual Result CreateRenderPass(NotNull const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;

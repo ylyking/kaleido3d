@@ -89,7 +89,7 @@ namespace k3d {
 #ifdef K3DPLATFORM_OS_WIN
 		gFrequency = GetPerformanceFrequency();
 #elif defined(K3DPLATFORM_OS_LINUX) && !defined(K3DPLATFORM_OS_ANDROID)
-		frequency = QueryFrequency();
+		gFrequency = QueryFrequency();
 #endif
 	}
 

@@ -1,11 +1,12 @@
 #include "Kaleido3D.h"
+#include <Core/Os.h>
+#include <Core/LogUtil.h>
+#include <KTL/String.hpp>
+#include <Core/Utils/StringUtils.h>
 #include "Bundle.h"
 #include "MeshData.h"
 #include "CameraData.h"
 #include "ImageData.h"
-#include "Os.h"
-#include "LogUtil.h"
-#include "Utils/StringUtils.h"
 #include <list>
 
 using namespace std;
@@ -18,9 +19,9 @@ namespace k3d
 		Os::File			BundleFile;
 		Archive				Archv;
 
-		kString				BundleDir;
-		kString				CacheDir;
-		kString				BundleName;
+		String				BundleDir;
+		String				CacheDir;
+		String				BundleName;
 		list<MeshData*>		Meshes;
 		list<CameraData*>	Cameras;
 		list<AssetChunk*>	Chunks;
@@ -29,8 +30,8 @@ namespace k3d
 		void Initialize()
 		{
 			CacheDir = BundleDir + BundleName;
-			auto bundlePath = BundleDir + BundleName + KT(".bundle");
-			Opened = BundleFile.Open(bundlePath.c_str(), IOWrite);
+			auto bundlePath = BundleDir + BundleName + ".bundle";
+			Opened = BundleFile.Open(bundlePath.CStr(), IOWrite);
 			if (Opened)
 			{
 				KLOG(Info, AssetBundleImpl, "Initialize");
@@ -56,16 +57,10 @@ namespace k3d
 		{
 			if (!mesh)
 				return;
-#if K3DPLATFORM_OS_WIN
-			wchar_t name[128];
-			StringUtil::CharToWchar(mesh->Name(), name, 128);
-			auto path = CacheDir + KT("/") + name;
-#else
-			auto path = CacheDir + KT("/") + mesh->Name();
-#endif
+			auto path = CacheDir + "/" + mesh->Name();
 			Os::File file;
 			KLOG(Info, AssetBundleImpl, "Serialize Mesh: %s", mesh->Name());
-			file.Open(path.c_str(),IOWrite);
+			file.Open(path.CStr(),IOWrite);
 			Archive archive;
 			archive.SetIODevice(&file);
 			EMeshVersion mVer = EMeshVersion::VERSION_1_1;
@@ -84,16 +79,10 @@ namespace k3d
 		{
 			if (!camera)
 				return;
-#if K3DPLATFORM_OS_WIN
-			wchar_t name[128];
-			StringUtil::CharToWchar(camera->Name(), name, 128);
-			auto path = CacheDir + KT("/") + name;
-#else
-			auto path = CacheDir + KT("/") + camera->Name();
-#endif
+			auto path = CacheDir + "/" + camera->Name();
 			Os::File file;
 			KLOG(Info, AssetBundleImpl, "Serialize Camera: %s", camera->Name());
-			file.Open(path.c_str(), IOWrite);
+			file.Open(path.CStr(), IOWrite);
 			Archive archive;
 			archive.SetIODevice(&file);
 			ECamVersion cVer = ECamVersion::VERSION_1_0;
@@ -122,16 +111,9 @@ namespace k3d
 		{
 			if (!chunk)
 				return;
-
-#if K3DPLATFORM_OS_WIN
-			wchar_t name[128];
-			StringUtil::CharToWchar(chunk->Name, name, 128);
-			auto path = CacheDir + KT("/") + name;
-#else
-			auto path = CacheDir + KT("/")+ chunk->Name;
-#endif
+			auto path = CacheDir + "/"+ chunk->Name;
 			Os::File file;
-			bool opened = file.Open(path.c_str(), IORead);
+			bool opened = file.Open(path.CStr(), IORead);
             if(!opened)
                 return;
 			int64 szFile = file.GetSize();
@@ -147,7 +129,7 @@ namespace k3d
 		}
 	};
 
-	AssetBundle* AssetBundle::CreateBundle(const kchar * bundleName, const kchar * bundleDir)
+	AssetBundle* AssetBundle::CreateBundle(const char * bundleName, const char * bundleDir)
 	{
 		return new AssetBundle(bundleName, bundleDir);
 	}
@@ -175,20 +157,20 @@ namespace k3d
 		}
 		if (deleteCache) 
 		{
-			Os::Remove(d->CacheDir.c_str());
+			Os::Path::Remove(d->CacheDir.CStr());
 		}
 		d->Close();
 		m_IsBundling = false;
 	}
 
-	AssetBundle::AssetBundle(const kchar * bundleName, const kchar * bundleDir)
+	AssetBundle::AssetBundle(const char * bundleName, const char * bundleDir)
 		: d(new AssetBundleImpl)
 		, m_IsBundling(false)
 	{
 		d->BundleDir = bundleDir;
-		kString _Name(bundleName);
-		size_t dotpos = _Name.find_last_of(KT("."));
-		d->BundleName = _Name.substr(0, dotpos);
+//		String _Name(bundleName);
+        /*size_t dotpos = _Name.find_last_of(KT("."));
+        d->BundleName = _Name.substr(0, dotpos);*/
 		d->Initialize();
 	}
 
@@ -205,7 +187,7 @@ namespace k3d
 	void AssetBundle::Prepare()
 	{
 		auto bundleTmpCache = d->BundleDir + d->BundleName;
-		Os::MakeDir(bundleTmpCache.c_str());
+		Os::Path::MakeDir(bundleTmpCache.CStr());
 	}
 
 }

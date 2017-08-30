@@ -38,8 +38,6 @@ namespace ngfx
                            CommandQueue * pCommandQueue,
                            void * pWindow,
                            SwapChain ** pSwapchain)override;
-    Result CreateCompiler(ShaderLang shaderLang, Compiler ** compiler) override;
-    
     NSArray <id<MTLDevice>>* Devices;
   };
   
@@ -59,13 +57,13 @@ public:
   ~MtlDevice() override;
   void GetDesc(DeviceDesc * pDesc) override;
   Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) override;
-  Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) override;
+  //Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) override;
   Result CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) override;
-  Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) override;
+  //Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) override;
   Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) override;
   Result CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) override;
   Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) override;
-  Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) override;
+  //Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) override;
   Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) override;
   Result CreateBuffer(const BufferDesc* desc, Buffer ** pBuffer) override;
   Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) override;

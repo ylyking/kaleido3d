@@ -7,6 +7,7 @@ endif()
 
 set(Kaleido3D_ROOT_DIR "${Kaleido3D_SOURCE_DIR}")
 set(K3D_THIRD_PARTY "${Kaleido3D_SOURCE_DIR}/Source/ThirdParty_Prebuilt")
+set(K3D_DEPENDS_PATH ${Kaleido3D_ROOT_DIR}/Build/Dependencies)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${Kaleido3D_SOURCE_DIR}/Project")
 set(CMAKE_FIND_ROOT_PATH "${K3D_THIRD_PARTY};${CMAKE_FIND_ROOT_PATH}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${Kaleido3D_ROOT_DIR}/Binary/")
@@ -24,7 +25,19 @@ include(Common)
 include(NDKStlConfig)
 include(FindPyYaml)
 
-find_package(ThirdParty)
+if(EXISTS "${K3D_DEPENDS_PATH}/lib/cmake/third_party.cmake")
+	message(STATUS "third_party exists")
+else()
+   	message(STATUS "have to download third_party....")
+	execute_process(COMMAND 
+		${PYTHON_EXECUTABLE} 
+		${Kaleido3D_SOURCE_DIR}/Tools/Build/get_dependencies.py
+		${K3D_DEPENDS_PATH}
+	)
+endif()
+
+include(${K3D_DEPENDS_PATH}/lib/cmake/third_party.cmake)
+#find_package(ThirdParty)
 find_package(LibClang)
 find_package(PythonInterp)
 
@@ -150,11 +163,11 @@ if(PY_YAML_FOUND)
 	add_subdirectory(Source/NGFX)
 endif()
 
-if(BUILD_WITH_V8)
+#if(BUILD_WITH_V8)
 	if(NOT (ANDROID OR MACOS))
 		add_subdirectory(Source/Script)
 	endif()
-endif()
+#endif()
 
 if(MAYA_FOUND)
 	add_subdirectory(Tools/MayaDCC)

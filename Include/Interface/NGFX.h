@@ -670,6 +670,18 @@ struct NGFXShaderSet
   }*/
 };
 
+KFORCE_INLINE bool operator==(NGFXShaderUniform const& lhs, NGFXShaderUniform const& rhs)
+{
+  return rhs.VarType == lhs.VarType && rhs.VarOffset == lhs.VarOffset &&
+  rhs.VarSzArray == lhs.VarSzArray && rhs.VarName == lhs.VarName;
+}
+
+KFORCE_INLINE bool operator==(NGFXShaderBinding const& lhs, NGFXShaderBinding const& rhs)
+{
+  return rhs.VarType == lhs.VarType && rhs.VarStage == lhs.VarStage &&
+  rhs.VarNumber == lhs.VarNumber && rhs.VarName == lhs.VarName;
+}
+
 struct NGFXShaderBindingTable
 {
   ::k3d::DynArray<NGFXShaderBinding> Bindings;

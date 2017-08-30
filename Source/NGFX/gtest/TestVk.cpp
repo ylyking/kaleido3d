@@ -2,7 +2,11 @@
 #include <ngfx.h>
 #include <ngfxu.h>
 #include <Core/Os.h>
+#include <Core/App.h>
+#include <KTL/DynArray.hpp>
 #include "gtest/gtest.h"
+
+using namespace k3d;
 
 #if _WIN32
 #pragma comment(linker,"/subsystem:console")
@@ -14,7 +18,7 @@ Ptr<Factory> GlobalTestFactory;
 Ptr<Device> GlobalTestDevice;
 Ptr<CommandQueue> gfxQueue;
 Ptr<RenderPass> GlobalTestRenderPass;
-Ptr<BindTableLayout> GlobalTableLayout;
+Ptr<BindTableEncoder> GlobalTableEncoder;
 Ptr<PipelineLayout> GlobalPipelineLayout;
 Ptr<Function> ComputeFunction;
 Ptr<Pipeline> GolbalPipeline;
@@ -40,7 +44,8 @@ TEST(CreateLibrary, ngfxLibrary)
   Ptr<Library> library;
   Ptr<Function> function;
   Os::MemMapFile blobFile;
-  ASSERT_TRUE(blobFile.Open("../../Data/Test/Test.blob", IORead));
+  String path = Os::Path::Join(GetEnv()->GetDataDir(), "Test", String("Test.blob"));
+  ASSERT_TRUE(blobFile.Open(path.CStr(), IORead));
   GlobalTestDevice->CreateLibrary(nullptr, blobFile.FileData(), blobFile.GetSize(), library.GetAddressOf());
   blobFile.Close();
   ASSERT_TRUE(library.Get());
@@ -74,25 +79,57 @@ TEST(CreateRenderPass, ngfxRenderPass)
   ASSERT_TRUE(GlobalTestRenderPass.Get());
 }
 
-TEST(CreateBindTableLayout, ngfxBindTableLayout)
+TEST(CreateBindTableEncoder, ngfxBindTableEncoder)
 {
+    DynArray<ArgumentDesc> argumentDescs;
+    argumentDescs.Resize(4);
+    argumentDescs[0].index = 2;
+    argumentDescs[0].dataType = DataType::Texture;
+    argumentDescs[0].textureDim = TextureDimension::Buffer;
+    argumentDescs[0].access |= ArgumentAccess::WriteOnly;
+    argumentDescs[0].access |= ArgumentAccess::ReadOnly;
+    argumentDescs[0].stage = ShaderStageBit::Compute;
+
+    argumentDescs[1].index = 3;
+    argumentDescs[1].dataType = DataType::Texture;
+    argumentDescs[1].textureDim = TextureDimension::Buffer;
+    argumentDescs[1].access |= ArgumentAccess::WriteOnly;
+    argumentDescs[1].access |= ArgumentAccess::ReadOnly;
+    argumentDescs[1].stage = ShaderStageBit::Compute;
+
+    argumentDescs[2].index = 1;
+    argumentDescs[2].dataType = DataType::Array;
+    argumentDescs[2].access = ArgumentAccess::ReadOnly;
+    argumentDescs[2].stage = ShaderStageBit::Compute;
+
+    argumentDescs[3].index = 0;
+    argumentDescs[3].dataType = DataType::Array;
+    argumentDescs[3].access = ArgumentAccess::ReadOnly;
+    argumentDescs[3].stage = ShaderStageBit::Compute;
+
+    GlobalTestDevice->MakeBindTableEncoder(
+        argumentDescs.Data(), 
+        argumentDescs.Count(), 
+        GlobalTableEncoder.GetAddressOf());
+/*
   Ptr<BindTableLayoutInitializer> btlInitializer;
   GlobalTestDevice->CreateBindTableLayoutInitializer(btlInitializer.GetAddressOf());
   btlInitializer->AddBuffer(0, 1, ShaderStageBit::Compute);
   btlInitializer->Initialize(GlobalTableLayout.GetAddressOf());
-  ASSERT_TRUE(GlobalTableLayout.Get());
+*/
+  ASSERT_TRUE(GlobalTableEncoder.Get() != nullptr);
 }
 
 TEST(CreateBindTable, ngfxBindTable)
 {
   Ptr<BindTable> bindTable;
-  ASSERT_TRUE(Result::Ok == GlobalTestDevice->CreateBindTable(GlobalTableLayout.Get(), bindTable.GetAddressOf()));
+  ASSERT_TRUE(Result::Ok == GlobalTableEncoder->Allocate(bindTable.GetAddressOf()));
   ASSERT_TRUE(bindTable.Get() != nullptr);
 }
 
 TEST(CreatePipelineLayout, ngfxPipelineLayout)
 {
-  PipelineLayoutDesc desc = { GlobalTableLayout.Get(), 1 };
+  PipelineLayoutDesc desc = { GlobalTableEncoder.Get(), 1 };
   GlobalTestDevice->CreatePipelineLayout(&desc, GlobalPipelineLayout.GetAddressOf());
   ASSERT_TRUE(GlobalPipelineLayout.Get() != nullptr);
 }
@@ -176,21 +213,22 @@ TEST(CreateSampler, ngfxSampler)
 
 TEST(CreateComputePipeline, ngfxComputePipeline)
 {
+  Ptr<Pipeline> SimplePipeline;
+  Ptr<PipelineReflection> SimpleReflection;
   auto Ret = GlobalTestDevice->CreateComputePipeline(
-    ComputeFunction.Get(),
-    GlobalPipelineLayout.Get(),
-    GlobalComputePipeline.GetAddressOf());
+      ComputeFunction.Get(), 
+      GlobalPipelineLayout.Get(),
+      SimplePipeline.GetAddressOf());
   ASSERT_TRUE(Ret == Result::Ok);
-  ASSERT_TRUE(GlobalComputePipeline.Get() != nullptr);
 }
 
 TEST(CreateRenderPipeline, ngfxRenderPipeline)
 {
   RenderPipelineDesc desc;
-  GlobalTestDevice->CreateRenderPipeline(&desc, 
-    GlobalPipelineLayout.Get(), 
+  GlobalTestDevice->CreateRenderPipeline(&desc,
     GlobalTestRenderPass.Get(),
-    GolbalPipeline.GetAddressOf());
+    GolbalPipeline.GetAddressOf(), 
+    nullptr);
   ASSERT_TRUE(GolbalPipeline.Get() != nullptr);
 }
 

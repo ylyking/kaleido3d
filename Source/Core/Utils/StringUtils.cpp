@@ -18,7 +18,7 @@ namespace k3d {
 		return md5.toString();
 	}
 
-#ifdef K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 	
 	void StringUtil::CharToWchar(const char *chr, wchar_t *wchar, int size)
 	{
@@ -37,7 +37,7 @@ namespace k3d {
 	std::string GenerateShaderCachePath(const char * szPath, const char * szEntryPoint, const char * szShaderModel)
 	{
 		char catName[1024] = { 0 };
-		::StringCbPrintfA(catName, 1024, "%s.%s.%s", szPath, szEntryPoint, szShaderModel);
+//		::StringCbPrintfA(catName, 1024, "%s.%s.%s", szPath, szEntryPoint, szShaderModel);
 		std::string newName = StringUtil::GenerateMD5(catName);
 		std::string path(szPath);
 		std::size_t posL = path.find_last_of("/");

@@ -1,6 +1,6 @@
 #include "Common.h"
-#include <Core/MeshData.h>
-#include <Core/CameraData.h>
+#include <Engine/Assets/MeshData.h>
+#include <Engine/Assets/CameraData.h>
 
 #if K3DPLATFORM_OS_WIN
 #pragma comment(linker,"/subsystem:console")

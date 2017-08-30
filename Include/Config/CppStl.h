@@ -13,7 +13,7 @@
 #include <cassert>
 
 #if K3DPLATFORM_OS_WIN
-typedef std::wstring kString;
+typedef std::string kString;
 #else
 typedef std::string kString;
 #endif

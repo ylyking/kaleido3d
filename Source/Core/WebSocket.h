@@ -3,8 +3,6 @@
 
 #include "Os.h"
 
-#include <vector>
-
 namespace net
 {
     enum WebSocketFrameType {
@@ -24,8 +22,11 @@ namespace net
         PONG_FRAME=0x1A
     };
 
+	class WebSocketImpl;
+
     class K3D_API WebSocket : public Os::Socket
     {
+        friend class WebSocketImpl;
     public:
 							WebSocket();
         virtual				~WebSocket();
@@ -35,22 +36,7 @@ namespace net
 		uint64				Send(Os::SocketHandle remote, const char * pData, uint32 sendLen) override;
 
     protected:
-
-		WebSocketFrameType	ParseHandshake(unsigned char *input_frame, size_t input_len);
-		std::string			AnswerHandshake();
-		WebSocketFrameType	GetFrame(unsigned char* in_buffer, size_t in_length, unsigned char* out_buffer, int out_size, int* out_length);
-		int					MakeFrame(WebSocketFrameType frame_type, const char* msg, int msg_len, unsigned char* buffer, int buffer_len);
-		std::string			Trim(std::string str);
-		std::vector<std::string> Explode(
-			std::string theString, std::string theDelimiter,
-			bool theIncludeEmptyStrings = false);
-
-		WebSocketFrameType	m_CurrentFameType;
-        std::string resource;
-        std::string host;
-        std::string origin;
-        std::string protocol;
-        std::string key;
+        WebSocketImpl*      d;
     };
 }
 

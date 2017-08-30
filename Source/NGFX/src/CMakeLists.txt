@@ -4,14 +4,14 @@ set(NGFX_YML ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/ngfx.yml)
 set_source_files_properties(${NGFX_HEADER}
 	PROPERTIES GENERATED TRUE)
 
-if (WIN32)
+if (WIN32 OR ANDROID OR LINUX)
     generate_win_res(ngfx_vulkan VER "1.0.0.1" DESC "Next Generation Graphics Module")
     generate_win_res(ngfxu VER "1.0.0.1" DESC "Next Generation Graphics Utility Module")
     generate_win_res(ngfx_vulkan_glslang VER "1.0.0.1" DESC "Next Generation Graphics Shader Compiler")
 
 	add_library(ngfx_vulkan_glslang SHARED vulkan_glslang.h vulkan_glslang.cpp ${ngfx_vulkan_glslang_RC})
 	target_compile_definitions(ngfx_vulkan_glslang PRIVATE BUILD_VULKAN_GLSLANG=1)
-	target_link_libraries(ngfx_vulkan_glslang ${GLSLANG_LIBRARIES} ${SPIRV2CROSS_LIBRARY} Kaleido3D.Core)
+	target_link_libraries(ngfx_vulkan_glslang ${GLSLANG_LIBRARIES} Kaleido3D.Core ${SPIRVTOOLS_LIBRARIES})
 	set_target_properties(ngfx_vulkan_glslang PROPERTIES FOLDER "ngfx/src")
 
 	add_library(ngfx_vulkan SHARED 
@@ -23,12 +23,13 @@ if (WIN32)
 
 	add_library(ngfxu SHARED ngfx.h ngfxu.h ngfxu.cpp ${ngfxu_RC})
 	set_target_properties(ngfxu PROPERTIES FOLDER "ngfx/src")
+	target_link_libraries(ngfxu Kaleido3D.Core)
 
 	add_custom_command(TARGET ngfx_vulkan PRE_BUILD COMMAND
 		${PYTHON_EXECUTABLE} ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/run.py -o 
 		${NGFX_HEADER} ${NGFX_YML})
 
-	target_link_libraries(ngfx_vulkan Kaleido3D.Core ngfx_vulkan_glslang ${VULKAN_LIB})
+	target_link_libraries(ngfx_vulkan Kaleido3D.Core ${SPIRVCROSS_LIBRARIES} ngfx_vulkan_glslang ${VULKAN_LIBRARIES})
 	set_target_properties(ngfx_vulkan PROPERTIES FOLDER "ngfx/src")
 elseif(MACOS)
 	add_library(ngfx_metal SHARED metal.cpp)

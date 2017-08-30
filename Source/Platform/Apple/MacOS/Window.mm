@@ -149,7 +149,7 @@ namespace k3d
 
     IWindow::Ptr MakePlatformWindow(const kchar *windowName, int width, int height)
     {
-        return std::make_shared<WindowImpl::OSXWindow>(windowName, width, height);
+        return MakeShared<WindowImpl::OSXWindow>(windowName, width, height);
     }
 }
 

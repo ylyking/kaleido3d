@@ -43,10 +43,10 @@ add_unittest(
 	UTTools.ShaderCompiler.cpp
 )
 
-add_unittest(
-	Core-UnitTest-8.UTFontLoader
-	UTFontLoader.cpp
-)
+#add_unittest(
+#	Core-UnitTest-8.UTFontLoader
+#	UTFontLoader.cpp
+#)
 
 add_unittest(
 	Core-UnitTest-9.Math

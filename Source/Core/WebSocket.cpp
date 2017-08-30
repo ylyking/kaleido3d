@@ -1,6 +1,6 @@
 #include "Kaleido3D.h"
+#include <KTL/String.hpp>
 #include "WebSocket.h"
-#include "Utils/Base64.h"
 #include "Utils/SHA1.h"
 
 using namespace Os;
@@ -8,14 +8,48 @@ using namespace std;
 
 namespace net
 {
-	const size_t BUF_SIZE = 4096;
+    using k3d::String;
 
-    WebSocket::WebSocket() : Socket(SockType::TCP)
+	const size_t BUF_SIZE = 4096;
+    
+    class WebSocketImpl
     {
+    public:
+        WebSocket* Owner;
+        WebSocketImpl(WebSocket* In) : Owner(In) {}
+
+
+        WebSocketFrameType	ParseHandshake(unsigned char *input_frame, size_t input_len);
+        k3d::String			AnswerHandshake();
+        WebSocketFrameType	GetFrame(unsigned char* in_buffer, size_t in_length, unsigned char* out_buffer, int out_size, int* out_length);
+        int					MakeFrame(WebSocketFrameType frame_type, const char* msg, int msg_len, unsigned char* buffer, int buffer_len);
+        k3d::String			Trim(k3d::String str);
+        std::vector<k3d::String> Explode(
+            k3d::String theString, k3d::String theDelimiter,
+            bool theIncludeEmptyStrings = false);
+
+        WebSocketFrameType	m_CurrentFameType;
+        k3d::String resource;
+        k3d::String host;
+        k3d::String origin;
+        k3d::String protocol;
+        k3d::String key;
+
+    };
+
+
+    WebSocket::WebSocket() : Socket(SockType::TCP), d(nullptr)
+    {
+        d = new WebSocketImpl(this);
     }
 
     WebSocket::~WebSocket()
     {
+        if (d)
+        {
+            delete d;
+            d = nullptr;
+        }
     }
 
 	Os::SocketHandle WebSocket::Accept(Os::IPv4Address & ipAddr)
@@ -25,11 +59,11 @@ namespace net
 		uint64 recvLen = Socket::Receive(handle, buffer, BUF_SIZE);
 		if (recvLen < BUF_SIZE)
 		{
-			if (ParseHandshake(buffer, recvLen) == OPENING_FRAME)
+			if (d->ParseHandshake(buffer, recvLen) == OPENING_FRAME)
 			{
-				string answer = AnswerHandshake();
-				uint64 sent = Socket::Send(handle, answer);
-				if (sent == answer.size())
+                k3d::String answer = d->AnswerHandshake();
+				uint64 sent = Socket::Send(handle, answer.CStr(), answer.Length());
+				if (sent == answer.Length())
 				{
 					return handle;
 				}
@@ -45,8 +79,8 @@ namespace net
 		if (realRecvLen < BUF_SIZE) // received all data
 		{
 			int out_length = 0;
-			m_CurrentFameType = GetFrame(buffer, realRecvLen, (unsigned char*)pData, recvLen, &out_length);
-			if (m_CurrentFameType != ERROR_FRAME)
+            d->m_CurrentFameType = d->GetFrame(buffer, realRecvLen, (unsigned char*)pData, recvLen, &out_length);
+			if (d->m_CurrentFameType != ERROR_FRAME)
 			{
 				return out_length;
 			}
@@ -61,7 +95,7 @@ namespace net
 	uint64 WebSocket::Send(Os::SocketHandle remote, const char * pData, uint32 sendLen)
 	{
 		unsigned char buffer[BUF_SIZE] = { 0 };
-		int realSize = MakeFrame(m_CurrentFameType, pData, sendLen, buffer, BUF_SIZE);
+		int realSize = d->MakeFrame(d->m_CurrentFameType, pData, sendLen, buffer, BUF_SIZE);
 		if (realSize < BUF_SIZE)
 		{
 			uint64 sent = Socket::Send(remote, (const char*)buffer, realSize);
@@ -73,103 +107,105 @@ namespace net
 		return 0;
 	}
 
-    WebSocketFrameType WebSocket::ParseHandshake(unsigned char *input_frame, size_t input_len)
+    WebSocketFrameType WebSocketImpl::ParseHandshake(unsigned char *input_frame, size_t input_len)
     {
         // 1. copy char*/len into string
         // 2. try to parse headers until \r\n occurs
-        string headers((char*)input_frame, input_len);
-		size_t header_end = headers.find("\r\n\r\n");
+        String headers((char*)input_frame, input_len);
+		auto header_end = headers.Find("\r\n\r\n");
 
-        if(header_end == string::npos) { // end-of-headers not found - do not parse
+        if(header_end == String::npos) { // end-of-headers not found - do not parse
             return INCOMPLETE_FRAME;
         }
 
-        headers.resize(header_end); // trim off any data we don't need after the headers
-        vector<string> headers_rows = Explode(headers, string("\r\n"));
+        headers.Resize(header_end); // trim off any data we don't need after the headers
+        vector<String> headers_rows = Explode(headers, String("\r\n"));
         for(int i=0; i<headers_rows.size(); i++) {
-            string& header = headers_rows[i];
-            if(header.find("GET") == 0) {
-                vector<string> get_tokens = Explode(header, string(" "));
+            String& header = headers_rows[i];
+            if(header.Find("GET") == 0) {
+                vector<String> get_tokens = Explode(header, String(" "));
                 if(get_tokens.size() >= 2) {
                     this->resource = get_tokens[1];
                 }
             }
             else {
-				size_t pos = header.find(":");
-                if(pos != string::npos) {
-                    string header_key(header, 0, pos);
-                    string header_value(header, pos+1);
-                    header_value = Trim(header_value);
-                    if(header_key == "Host") this->host = header_value;
-                    else if(header_key == "Origin") this->origin = header_value;
-                    else if(header_key == "Sec-WebSocket-Key") this->key = header_value;
-                    else if(header_key == "Sec-WebSocket-Protocol") this->protocol = header_value;
+				auto pos = header.Find(":");
+                if(pos != String::npos) {
+                    //String header_key(header, 0, pos);
+                    //String header_value(header, pos+1);
+                    //header_value = Trim(header_value);
+                    //if(header_key == "Host") this->host = header_value;
+                    //else if(header_key == "Origin") this->origin = header_value;
+                    //else if(header_key == "Sec-WebSocket-Key") this->key = header_value;
+                    //else if(header_key == "Sec-WebSocket-Protocol") this->protocol = header_value;
                 }
             }
         }
 		return OPENING_FRAME;
     }
 
-    string WebSocket::Trim(string str)
+    k3d::String WebSocketImpl::Trim(k3d::String str)
     {
-        auto whitespace = " \t\r\n";
-        string::size_type pos = str.find_last_not_of(whitespace);
-        if(pos != string::npos) {
-            str.erase(pos + 1);
-            pos = str.find_first_not_of(whitespace);
-            if(pos != string::npos) str.erase(0, pos);
+        String whitespace = " \t\r\n";
+        auto pos = str.FindLastNotOf(whitespace);
+        if(pos != String::npos) {
+            str.Erase(pos + 1);
+            pos = str.FindFirstNotOf(whitespace);
+            if (pos != String::npos)
+            {
+                str.Erase(0, pos);
+            }
         }
         else {
-            return string();
+            return String();
         }
-        return str;
+        return String();
     }
 
-    vector<string> WebSocket::Explode(
-            string  theString,
-            string  theDelimiter,
-            bool    theIncludeEmptyStrings)
+    vector<String> WebSocketImpl::Explode(
+        String  theString,
+        String  theDelimiter,
+        bool    theIncludeEmptyStrings)
     {
-        vector<string> theStringVector;
+        vector<String> theStringVector;
 		size_t  start = 0, end = 0, length = 0;
 
-        while ( end != string::npos )
+        while ( end != String::npos )
         {
-            end = theString.find( theDelimiter, start );
+            //end = theString.Find( theDelimiter, start );
 
             // If at end, use length=maxLength.  Else use length=end-start.
-            length = (end == string::npos) ? string::npos : end - start;
+            length = (end == String::npos) ? String::npos : end - start;
 
             if (theIncludeEmptyStrings
                 || (   ( length > 0 ) /* At end, end == length == string::npos */
-                       && ( start  < theString.size() ) ) )
-                theStringVector.push_back( theString.substr( start, length ) );
+                       && ( start  < theString.Length() ) ) )
+                theStringVector.push_back( theString.SubStr( start, length ) );
 
             // If at end, use start=maxSize.  Else use start=end+delimiter.
-            start = (   ( end > (string::npos - theDelimiter.size()) )
-                        ?  string::npos  :  end + theDelimiter.size()     );
+            start = (   ( end > (String::npos - theDelimiter.Length()) )
+                        ?  String::npos  :  end + theDelimiter.Length()     );
         }
         return theStringVector;
     }
 
-    string WebSocket::AnswerHandshake()
+    String WebSocketImpl::AnswerHandshake()
     {
-        unsigned char digest[20]; // 160 bit sha1 digest
-
-        string answer;
+        String digest(20, '0');
+        String answer;
         answer += "HTTP/1.1 101 Switching Protocols\r\n";
         answer += "Upgrade: WebSocket\r\n";
         answer += "Connection: Upgrade\r\n";
-        if(this->key.length() > 0) {
-            string accept_key;
+        if(this->key.Length() > 0) {
+            String accept_key;
             accept_key += this->key;
             accept_key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //RFC6544_MAGIC_KEY
 
             //printf("INTERMEDIATE_KEY:(%s)\n", accept_key.data());
 
             SHA1 sha;
-            sha.Input(accept_key.data(), (unsigned int)accept_key.size());
-            sha.Result((unsigned*)digest);
+            sha.Input(accept_key.CStr(), (unsigned int)accept_key.Length());
+            sha.Result((unsigned*)digest.CStr());
 
             //printf("DIGEST:"); for(int i=0; i<20; i++) printf("%02x ",digest[i]); printf("\n");
 
@@ -188,11 +224,11 @@ namespace net
 
             //printf("DIGEST:"); for(int i=0; i<20; i++) printf("%02x ",digest[i]); printf("\n");
 
-            accept_key = Base64::Encode((const unsigned char *)digest, 20); //160bit = 20 bytes/chars
+            accept_key = k3d::Base64Encode(digest); //160bit = 20 bytes/chars
 
             answer += "Sec-WebSocket-Accept: "+(accept_key)+"\r\n";
         }
-        if(this->protocol.length() > 0) {
+        if(this->protocol.Length() > 0) {
             answer += "Sec-WebSocket-Protocol: "+(this->protocol)+"\r\n";
         }
         answer += "\r\n";
@@ -201,7 +237,7 @@ namespace net
         //return WS_OPENING_FRAME;
     }
 
-    int WebSocket::MakeFrame(WebSocketFrameType frame_type, const char* msg, int msg_length, unsigned char* buffer, int buffer_size)
+    int WebSocketImpl::MakeFrame(WebSocketFrameType frame_type, const char* msg, int msg_length, unsigned char* buffer, int buffer_size)
     {
         int pos = 0;
         int size = msg_length;
@@ -235,7 +271,7 @@ namespace net
         return (size+pos);
     }
 
-    WebSocketFrameType WebSocket::GetFrame(unsigned char* in_buffer, size_t in_length, unsigned char* out_buffer, int out_size, int* out_length)
+    WebSocketFrameType WebSocketImpl::GetFrame(unsigned char* in_buffer, size_t in_length, unsigned char* out_buffer, int out_size, int* out_length)
     {
         if(in_length < 3) return INCOMPLETE_FRAME;
 

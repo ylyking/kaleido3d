@@ -83,21 +83,25 @@ namespace k3d
 		AAssetManager* 	assets;
 #endif
 	public:
-		static const kString ENV_KEY_LOG_DIR;
-		static const kString ENV_KEY_MODULE_DIR;
-		static const kString ENV_KEY_APP_NAME;
 #if K3DPLATFORM_OS_ANDROID
 		AAssetManager* GetAssets() { return assets; }
 		void __init__(JNIEnv* env, jobject instance, jstring appName, jstring path, AAssetManager* asset);
 #endif
 		Environment();
 		~Environment();
-		kString GetEnvValue(const kString & var);
+
+        String GetLogDir() const;
+        String GetModuleDir() const;
+        String GetDataDir() const;
+        String GetInstanceName() const;
+    
+    private:
+        struct EnvironmentImpl* d;
 	};
 
 	extern CORE_API Environment* GetEnv();
 
-	uint32 K3D_API RunApplication(App & app, kString const & appName);
+	uint32 K3D_API RunApplication(App & app, String const & appName);
 }
 
 #if K3DPLATFORM_OS_MAC
@@ -139,7 +143,7 @@ return new className(#className);\
 	int WinMain(HINSTANCE,HINSTANCE,LPSTR CmdLine,int) \
 	{ \
 		className app(#className); \
-		return ::k3d::RunApplication(app, L## #className); \
+		return ::k3d::RunApplication(app, #className); \
 	}
 #elif K3DPLATFORM_OS_ANDROID
 extern k3d::App* ACreateApp(ANativeWindow*,int,int);
@@ -149,6 +153,13 @@ k3d::App* ACreateApp(ANativeWindow*window,int width,int height) {\
 	test->InitWindow(window);\
 	return test;\
 }
+#elif K3DPLATFORM_OS_LINUX
+#define K3D_APP_MAIN(className) \
+	int main(int argc, char *argv[]) \
+    {\
+        className app(#className); \
+        return ::k3d::RunApplication(app, #className); \
+    }
 #endif
 
 #endif

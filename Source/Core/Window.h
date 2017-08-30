@@ -10,7 +10,7 @@ namespace k3d
 	class App;
 
 	enum class WindowMode 
-  {
+    {
 		NORMAL,
 		FULLSCREEN
 	};

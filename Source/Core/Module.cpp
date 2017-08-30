@@ -16,7 +16,7 @@ namespace k3d
 	class ModuleManagerPrivate
 	{
 	public:
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 		std::list<std::pair<IModule*, HMODULE> > g_ModuleList;
 		std::unordered_map<std::string, HMODULE> g_Win32ModuleMap;
 #endif
@@ -36,7 +36,7 @@ namespace k3d
 		}
 		//KLOG(Info, ModuleManager, "Destroyed");
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 		if (!p->g_Win32ModuleMap.empty())
 		{
 			for (auto & entry : p->g_Win32ModuleMap)
@@ -65,12 +65,18 @@ namespace k3d
 	bool ModuleManager::LoadModule(const char * moduleName)
 	{
 		if (!p->g_IsInited)
-			return nullptr;
+			return false;
 		String entryFunction;
 		entryFunction.AppendSprintf("Get%sModule", moduleName);
+#if K3DPLATFORM_OS_WINDOWS
+        String moduleDir = Os::Path::Join(GetEnv()->GetModuleDir(), String(moduleName) + ".dll");
 #if K3DPLATFORM_OS_WIN
-        std::string moduleDir = "./";
-		HMODULE hModule = LoadLibraryA((moduleDir + moduleName + ".dll").c_str());
+		HMODULE hModule = LoadLibraryA(moduleDir.CStr());
+#else
+        WCHAR WPath[512] = { 0 };
+        MultiByteToWideChar(CP_UTF8, 0, moduleDir.CStr(), moduleDir.Length(), WPath, 512);
+        HMODULE hModule = LoadPackagedLibrary(WPath, 0);
+#endif
 		if (hModule)
 		{
 			PFN_GetModule pFn = (PFN_GetModule)::GetProcAddress((HMODULE)hModule, entryFunction.CStr());
@@ -81,17 +87,23 @@ namespace k3d
 #else
 
 #if !K3DPLATFORM_OS_IOS
-        kString libDir = GetEnv()->GetEnvValue(Environment::ENV_KEY_MODULE_DIR) + "/lib" + moduleName +
+        String libDir = Os::Path::Join(GetEnv()->GetModuleDir(), String("lib") + moduleName +
 #if K3DPLATFORM_OS_MAC
-        ".dylib";
+        ".dylib");
 #else
-        ".so";
+        ".so");
 #endif
-        if(libDir.empty())
+        if(libDir.Length() == 0)
         {
             return false;
         }
-        void* handle = ::dlopen(libDir.c_str(), RTLD_LAZY);
+        //void* han_ = ::dlopen("libvulkan.so", RTLD_NOW);
+        void* handle = ::dlopen(libDir.CStr(), RTLD_LAZY);
+        if(!handle)
+        {
+//            String errorS(dlerror());
+//printf("dlopen - %sn", dlerror());
+        }
 #else
         //kString libDir = kString(moduleName) + ".framework/" + moduleName;
         String libDir;

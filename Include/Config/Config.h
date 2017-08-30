@@ -3,21 +3,24 @@
 #define __Config_H__
 //--------------------------- Project Global Config --------------------------//
 
-/** OS Definitions **/
-#ifdef _WIN32
-	#define K3DPLATFORM_OS_WIN 1
-#elif defined(__linux) || defined(linux)
-	#define K3DPLATFORM_OS_LINUX 1
-#elif defined(K3DPLATFORM_OS_MAC)
-	#define K3DPLATFORM_OS_MAC 1
-#elif defined(K3DPLATFORM_OS_IOS)
-    #define K3DPLATFORM_OS_IOS 1
-#else
-	#error "Not Support This Platform OS!!"
-#endif
+/** OS Definitions by CMake **/
+//#ifdef _WIN32
+//	#define K3DPLATFORM_OS_WIN 1
+//#elif defined(__linux) || defined(linux)
+//	#define K3DPLATFORM_OS_LINUX 1
+//#elif defined(K3DPLATFORM_OS_MAC)
+//	#define K3DPLATFORM_OS_MAC 1
+//#elif defined(K3DPLATFORM_OS_IOS)
+//    #define K3DPLATFORM_OS_IOS 1
+//#else
+//	#error "Not Support This Platform OS!!"
+//#endif
+
+#define K3DPLATFORM_OS_WINDOWS (K3DPLATFORM_OS_WIN || K3DPLATFORM_OS_WINUWP)
+#define K3DPLATFORM_OS_UNIX (K3DPLATFORM_OS_LINUX || K3DPLATFORM_OS_MAC || K3DPLATFORM_OS_IOS || K3DPLATFORM_OS_ANDROID)
 
 /** Compiler Definiotions **/
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #ifdef _MSC_VER
   #if (_MSC_VER < 1800)
 	  #pragma message ("Not Support C++ Compiler Version Under MS Visual C++ 110! For This Project Need C++11 Support")
@@ -52,7 +55,7 @@
 
 #define K3D_NOEXCEPT noexcept
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     #define KALIGN( X ) __declspec( align(X) )
 #else
     #define KALIGN( X ) __attribute__( (aligned(X)) )
@@ -71,7 +74,7 @@
 
 #define K3D_UNUSED(x) (void)x
 
-#if defined(K3DPLATFORM_OS_WIN)
+#if K3DPLATFORM_OS_WINDOWS
 #define K3D_APPLICATION_NAME L"kaleido3d app"
 //#pragma comment(linker, "/SUBSYSTEM:CONSOLE")
 	#if defined(LIB_BUILD)

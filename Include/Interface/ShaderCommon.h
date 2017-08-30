@@ -50,12 +50,6 @@ K3D_COMMON_NS
     return ar;
   }
 
-  KFORCE_INLINE bool operator==(NGFXShaderUniform const& lhs, NGFXShaderUniform const& rhs)
-  {
-    return rhs.VarType == lhs.VarType && rhs.VarOffset == lhs.VarOffset &&
-      rhs.VarSzArray == lhs.VarSzArray && rhs.VarName == lhs.VarName;
-  }
-
   KFORCE_INLINE::k3d::Archive& operator<<(::k3d::Archive& ar,
     NGFXShaderBinding const& attr)
   {
@@ -67,12 +61,6 @@ K3D_COMMON_NS
   {
     ar >> attr.VarType >> attr.VarStage >> attr.VarNumber >> attr.VarName;
     return ar;
-  }
-
-  KFORCE_INLINE bool operator==(NGFXShaderBinding const& lhs, NGFXShaderBinding const& rhs)
-  {
-    return rhs.VarType == lhs.VarType && rhs.VarStage == lhs.VarStage &&
-      rhs.VarNumber == lhs.VarNumber && rhs.VarName == lhs.VarName;
   }
 
   KFORCE_INLINE::k3d::Archive& operator<<(::k3d::Archive& ar,

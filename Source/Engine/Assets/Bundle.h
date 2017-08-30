@@ -49,7 +49,7 @@ namespace k3d
 	class K3D_API AssetBundle
 	{
 	public:
-		static AssetBundle * CreateBundle(const kchar * bundleName, const kchar * bundleDir);
+		static AssetBundle * CreateBundle(const char * bundleName, const char * bundleDir);
 		~AssetBundle();
 
 		void Prepare();
@@ -60,7 +60,7 @@ namespace k3d
 		void MergeAndBundle(bool deleteCache);
 
 	private:
-		AssetBundle(const kchar * bundleName, const kchar * bundleDir);
+		AssetBundle(const char * bundleName, const char * bundleDir);
 		class AssetBundleImpl * d;
 
 	private:

@@ -2,7 +2,7 @@
 #include "Config/Config.h"
 #include <KTL/SharedPtr.hpp>
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #define PLUGIN_API_DECLARE  __declspec(dllexport)
 #else
 #define PLUGIN_API_DECLARE  __attribute__((visibility("default")))
@@ -10,13 +10,13 @@
 
 #ifdef BUILD_SHARED_LIB
 #ifdef BUILD_WITH_PLUGIN
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #define CORE_API __declspec(dllimport)
 #else
 #define CORE_API __attribute__((visibility("default")))
 #endif
 #else
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #define CORE_API __declspec(dllexport)
 #else
 #define CORE_API __attribute__((visibility("default")))

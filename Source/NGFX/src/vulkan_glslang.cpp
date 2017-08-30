@@ -1,12 +1,13 @@
+#include "Kaleido3D.h"
+#include <KTL/Allocator.hpp>
 #include "vulkan_glslang.h"
 using namespace ngfx;
 
 #include <SPIRV/GlslangToSpv.h>
 #include <glslang/MachineIndependent/localintermediate.h>
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv-tools/optimizer.hpp>
 
 using namespace glslang;
-using namespace spirv_cross;
 
 #include <Kaleido3D.h>
 #include <Core/Os.h>
@@ -162,161 +163,6 @@ void initResources(TBuiltInResource &resources)
   resources.limits.generalConstantMatrixVectorIndexing = 1;
 }
 
-class SPIRVVariable : public ngfx::Variable
-{
-public:
-  const char *    Name() override { return name.c_str(); }
-  ArgumentAccess  Access() override;
-  VariableType *  Type() override { return type; }
-  uint32_t        Index() override { return id; }
-  bool            Active() override { return active; }
-
-  std::string     name;
-  VariableType*   type;
-  uint32_t        id;
-  bool            active;
-};
-
-class SPIRVArrayType : public ngfx::ArrayType
-{
-public:
-  DataType      GetType() override { return DataType::Array; }
-
-  uint32_t      Length() override { return length; }
-  DataType      ElementType() override { return elementType; }
-  uint32_t      Stride() override { return stride; }
-  VariableType* Elements() override { return elementType_; }
-
-  uint32_t      length;
-  uint32_t      stride;
-  DataType      elementType;
-  VariableType* elementType_;
-};
-
-class SPIRVStructType : public ngfx::StructType
-{
-public:
-  DataType      GetType() override { return DataType::Struct; }
-
-};
-
-class SPIRVPointerType : public ngfx::PointerType
-{
-public:
-  DataType        GetType() override { return DataType::Pointer; }
-
-  ArgumentAccess  Access() override { return access; }
-  uint32_t        Alignment() override { return alignment; }
-  uint32_t        DataSize() override { return dataSize; }
-  DataType        ElementType() override { return dataType; }
-
-  SPIRVPointerType() = default;
-
-  ArgumentAccess  access = ArgumentAccess::ReadOnly;
-  uint32_t        alignment = 0;
-  uint32_t        dataSize = 0;
-  DataType        dataType = DataType::Pointer;
-};
-
-class SPIRVTextureType : public ngfx::TextureReferType
-{
-public:
-  DataType          GetType() override { return DataType::Texture; }
-
-  ArgumentAccess    Access() override { return access; }
-
-  ArgumentAccess    access;
-  DataType          dataType;
-  TextureDimension  dim;
-};
-
-SPIRVCrossReflection::SPIRVCrossReflection(void* pData, uint32_t size)
-  : m_Reflector(nullptr)
-{
-  m_Reflector = new spirv_cross::Compiler(reinterpret_cast<const uint32_t*>(pData), size/4);
-  DoReflect();
-}
-
-SPIRVCrossReflection::SPIRVCrossReflection(const ByteCode & bc)
-{
-  m_Reflector = new spirv_cross::Compiler(bc);
-  DoReflect();
-}
-
-SPIRVCrossReflection::~SPIRVCrossReflection()
-{
-  if (m_Reflector)
-  {
-    delete m_Reflector;
-    m_Reflector = nullptr;
-  }
-}
-
-ngfx::ShaderType SPIRVCrossReflection::GetStage() const
-{
-  return ngfx::ShaderType();
-}
-
-void SPIRVCrossReflection::DoReflect()
-{
-  for (auto& res : m_Reflector->get_shader_resources().storage_buffers)
-  {
-    SPIRVVariable* var = new SPIRVVariable;
-    var->name = m_Reflector->get_name(res.id);
-    var->id = m_Reflector->get_decoration(res.id, spv::DecorationBinding);
-    auto type = m_Reflector->get_type(res.type_id);
-    //uint32_t bindingSet = m_Reflector->get_decoration(res.id, spv::DecorationDescriptorSet);
-    if (type.pointer)
-    {
-      SPIRVPointerType* pType = new SPIRVPointerType;
-      auto b_type = m_Reflector->get_type(res.base_type_id);
-      switch (b_type.basetype)
-      {
-      case SPIRType::Struct:
-        // expand struct
-        auto r = m_Reflector->get_type(b_type.member_types[0]);
-        break;
-      }
-      var->type = pType;
-    }
-    else
-    {
-      SPIRVArrayType* aType = new SPIRVArrayType;
-      var->active;
-      var->type = aType;
-    }
-    m_Vars.push_back(var);
-  }
-}
-
-uint32_t SPIRVCrossReflection::VariableCount() const
-{
-  return m_Vars.size();
-}
-
-ngfx::Variable* SPIRVCrossReflection::VariableAt(uint32_t id) const
-{
-  return m_Vars[id];
-}
-
-ArgumentAccess SPIRVVariable::Access()
-{
-  switch (type->GetType())
-  {
-  case DataType::Array:
-    //static_cast<SPIRVArrayType*>(type)->
-    break;
-  case DataType::Struct:
-    //static_cast<SPIRVStructType*>(type)->
-    break;
-  case DataType::Pointer:
-    return static_cast<SPIRVPointerType*>(type)->access;
-  case DataType::Texture:
-    return static_cast<SPIRVTextureType*>(type)->access;
-  }
-  return ArgumentAccess::ReadOnly;
-}
-
 ngfx::Result CompileFromSource(const ngfx::CompileOption & Opt, const char * pSource, FunctionMap & FuncMap, 
   std::string& ErrorInfo)
 {
@@ -376,18 +222,25 @@ ngfx::Result CompileFromSource(const ngfx::CompileOption & Opt, const char * pSo
       ShFinalize();
       return Result::Failed;
     }
-    GlslangToSpv(*program.getIntermediate(lang), data.ByteCode);
+    if (program.buildReflection())
+    {
+    }
+    GlslangToSpv(*program.getIntermediate(lang), data.ByteCodes);
+    spvtools::SpirvTools core(SPV_ENV_VULKAN_1_0);
+    spvtools::Optimizer opt(SPV_ENV_VULKAN_1_0);
+    opt.RegisterPass(spvtools::CreateFreezeSpecConstantValuePass())
+        .RegisterPass(spvtools::CreateUnifyConstantPass())
+        /*.RegisterPass(spvtools::CreateStripDebugInfoPass())*/;
+    if (!opt.Run(data.ByteCodes.data(), data.ByteCodes.size(), &data.ByteCodes))
+    {
+        ShFinalize();
+        return Result::Failed;
+    }
     FuncMap[name] = data;
     delete tmpShader;
   }
 
   ShFinalize();
-  return Result::Ok;
-}
-
-ngfx::Result ReflectFromSPIRV(ByteCode const & bc, ngfx::PipelineReflection ** ppResult)
-{
-  *ppResult = new SPIRVCrossReflection(bc);
   return Result::Ok;
 }
 
@@ -416,7 +269,7 @@ ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path)
   for (auto pair : Data)
   {
     auto& fData = pair.second;
-    auto SzByteCode = fData.ByteCode.size() * sizeof(uint32_t);
+    auto SzByteCode = fData.ByteCodes.size() * sizeof(uint32_t);
     EntryInfo Info;
     memset(&Info, 0, sizeof(Info));
     Info.OffSet = Offset;
@@ -430,7 +283,7 @@ ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path)
 
   for (auto pair : Data)
   {
-    ArchLib.ArrayIn(pair.second.ByteCode.data(), pair.second.ByteCode.size());
+    ArchLib.ArrayIn(pair.second.ByteCodes.data(), pair.second.ByteCodes.size());
   }
   OutputLib.Close();
   return Result::Ok;

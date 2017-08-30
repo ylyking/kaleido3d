@@ -1,16 +1,10 @@
 include_directories(.. ../../Include)
 
-set(SRC_ASSETMANAGER	AssetManager.h AssetManager.cpp Bundle.h Bundle.cpp)
-set(SRC_CAMERA			CameraData.h CameraData.cpp)
-set(SRC_MESH			MeshData.h MeshData.cpp ObjectMesh.h ObjectMesh.cpp RiggedMeshData.h RiggedMeshData.cpp)
-set(SRC_IMAGE			ImageData.h ImageData.cpp)
+if(UNIX)
+find_package(X11)
+include_directories(${X11_INCLUDE_DIR})
+endif()
 
-source_group(Asset				FILES ${SRC_ASSETMANAGER})
-source_group("Asset\\Mesh"		FILES ${SRC_MESH})
-source_group("Asset\\Camera"	FILES ${SRC_CAMERA})
-source_group("Asset\\Image"		FILES ${SRC_IMAGE})
-
-set(ASSET_SRCS ${SRC_ASSETMANAGER} ${SRC_CAMERA} ${SRC_MESH} ${SRC_IMAGE})
 
 set(UTIL_SRCS
     LogUtil.h
@@ -19,12 +13,14 @@ set(UTIL_SRCS
     Utils/StringUtils.cpp
     Utils/MD5.h
     Utils/MD5.cpp
-    Utils/Base64.h
-    Utils/Base64.cpp
+#    Utils/Base64.h
+#    Utils/Base64.cpp
     Utils/SHA1.h
     Utils/SHA1.cpp
     Utils/farmhash.h
     Utils/farmhash.cc
+    AssetManager.h 
+    AssetManager.cpp
 )
 
 source_group(Utils FILES ${UTIL_SRCS})
@@ -48,7 +44,10 @@ set(CONCURR_SRCS
 )
 
 source_group(Concurrent FILES ${CONCURR_SRCS})
-set(CORE_SRCS ${ASSET_SRCS} ${CONCURR_SRCS} ${UTIL_SRCS})
+set(CORE_SRCS 
+#${ASSET_SRCS} 
+${CONCURR_SRCS} 
+${UTIL_SRCS})
 set(MSG_SRCS Message.h InputDevice.h InputDevice.cpp)
 source_group("XPlatform\\Message" FILES ${MSG_SRCS})
 
@@ -84,8 +83,13 @@ set(CORE_SRCS ${CORE_SRCS} ${MSG_SRCS} ${COMMON_SRCS} ${MODULE_SRC})
 
 ####################Platform Specified###################
 
-if(WIN32)
-    file(GLOB WINDOWS_IMPL_SRCS "../Platform/Windows/*.cpp" "../Platform/Windows/*.h")
+if(WINUWP)
+    file(GLOB WINDOWS_IMPL_SRCS "../Platform/Microsoft/UWP/*.cpp" "../Platform/Microsoft/UWP/*.h")
+    source_group("XPlatform\\WindowsUWP" FILES ${WINDOWS_IMPL_SRCS} ${Core_RC})
+    generate_win_res(Core VER "1.0.0.1" DESC "Kernel Module")
+    set(CORE_SRCS ${CORE_SRCS} ${WINDOWS_IMPL_SRCS} ${Core_RC} ${MATH_SRCS})
+elseif(WIN32)
+    file(GLOB WINDOWS_IMPL_SRCS "../Platform/Microsoft/Win32/*.cpp" "../Platform/Microsoft/Win32/*.h")
     source_group("XPlatform\\Windows" FILES ${WINDOWS_IMPL_SRCS} ${Core_RC})
     generate_win_res(Core VER "1.0.0.1" DESC "Kernel Module")
     set(CORE_SRCS ${CORE_SRCS} ${WINDOWS_IMPL_SRCS} ${Core_RC} ${MATH_SRCS})
@@ -106,6 +110,10 @@ elseif(MACOS)
     source_group("XPlatform\\OSX" FILES ${OSX_IMPL_SRCS})
     set(CORE_SRCS ${CORE_SRCS} ${OSX_IMPL_SRCS} ${MATH_SRCS})
     list(APPEND CORE_DEP_LIBS "-framework Cocoa" "-framework AppKit" "-framework QuartzCore" "-framework CoreData" "-framework Foundation")
+elseif(UNIX)
+    file(GLOB LINUX_IMPL_SRCS "../Platform/Linux/*.cpp" "../Platform/Linux/*.h")
+    source_group("XPlatform\\Linux" FILES ${LINUX_IMPL_SRCS})
+    set(CORE_SRCS ${CORE_SRCS} ${LINUX_IMPL_SRCS} ${MATH_SRCS})
 endif()
 
 k3d_add_lib(Core SRCS ${CORE_SRCS} LIBS ${CORE_DEP_LIBS} FOLDER "Runtime"
@@ -116,8 +124,8 @@ k3d_add_lib(Core SRCS ${CORE_SRCS} LIBS ${CORE_DEP_LIBS} FOLDER "Runtime"
 
 if(MACOS)
     if(BUILD_SHARED)
-        add_custom_command(TARGET Core POST_BUILD COMMAND
-            ${CMAKE_INSTALL_NAME_TOOL} -id "@loader_path/../Frameworks/libCore.dylib" $<TARGET_FILE:Core>)
+        add_custom_command(TARGET Kaleido3D.Core POST_BUILD COMMAND
+            ${CMAKE_INSTALL_NAME_TOOL} -id "@loader_path/../Frameworks/libCore.dylib" $<TARGET_FILE:Kaleido3D.Core>)
     endif()
 endif()
 

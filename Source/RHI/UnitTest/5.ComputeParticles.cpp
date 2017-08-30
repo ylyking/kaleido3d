@@ -316,7 +316,7 @@ UTComputeParticles::OnUpdate()
 
   last_ticks = current_ticks;
 
-  KLOG(Info, GPUPerf, "usage %.3f.", Os::GetGpuUsage(0));
+  //KLOG(Info, GPUPerf, "usage %.3f.", Os::GetGpuUsage(0));
 }
 
 void

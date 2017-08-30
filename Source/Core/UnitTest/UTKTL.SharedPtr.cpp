@@ -1,5 +1,6 @@
 #include "Common.h"
-#include <Core/CameraData.h>
+#include <Engine/Assets/CameraData.h>
+#include <Core/App.h>
 #include <KTL/String.hpp>
 #include <iostream>
 
@@ -123,8 +124,17 @@ int atexit(void)
 	return 0;
 }
 
+class TestApp : public App
+{
+public:
+	TestApp() : App("Test", 1920, 1080) {}
+	void OnProcess(Message& msg) {}
+};
+
 int main(int argc, char**argv)
 {
 	TestSharedPtr();
+	TestApp app;
+	app.Run();
 	return 0;
 }

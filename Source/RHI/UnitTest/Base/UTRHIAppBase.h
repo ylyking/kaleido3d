@@ -182,7 +182,7 @@ RHIAppBase::LoadGlslangCompiler()
 
 inline void RHIAppBase::LoadConfig()
 {
-  if (Os::Exists(KT("RHI_Config.json")))
+  if (Os::Path::Exists("RHI_Config.json"))
   {
     Os::File file("RHI_Config.json");
     if (!file.Open(IORead))

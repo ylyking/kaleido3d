@@ -100,7 +100,7 @@ K3D_COMMON_NS
       __Initializer<ElementType>::DoInit(m_pElement, m_pElement + m_Capacity);
     }
 
-    DynArray(int capacity) K3D_NOEXCEPT
+    DynArray(uint64 capacity) K3D_NOEXCEPT
       : m_ElementIndex(0)
       , m_ElementCount(0)
       , m_Capacity(capacity)
@@ -111,7 +111,7 @@ K3D_COMMON_NS
       __Initializer<ElementType>::DoInit(m_pElement, m_pElement + m_Capacity);
     }
 
-    DynArray(int size, ElementType const& value) K3D_NOEXCEPT
+    DynArray(uint64 size, ElementType const& value) K3D_NOEXCEPT
       : m_ElementIndex(size-1)
       , m_ElementCount(size)
       , m_Capacity(size)
@@ -166,7 +166,7 @@ K3D_COMMON_NS
       , m_pElement(nullptr)
     {
       m_Capacity =
-        (uint32)(count * sizeof(OtherElementType) / sizeof(ElementType) * 1.5f);
+        (uint64)(count * sizeof(OtherElementType) / sizeof(ElementType) * 1.5f);
       m_ElementCount = count * sizeof(OtherElementType) / sizeof(ElementType);
       m_pElement =
         (ElementType*)m_Allocator.allocate(m_Capacity * sizeof(ElementType), 0);
@@ -184,7 +184,7 @@ K3D_COMMON_NS
 
     void Deconstruct()
     {
-      for (uint32 i = 0; i < m_ElementCount; i++) {
+      for (uint64 i = 0; i < m_ElementCount; i++) {
         typedef ElementType ElementTypeType;
         m_pElement[i].ElementTypeType::~ElementTypeType();
       }
@@ -285,12 +285,12 @@ K3D_COMMON_NS
       m_ElementCount = NewElementCount;
     }
 
-    ElementType const& operator[](uint32 index) const
+    ElementType const& operator[](uint64 index) const
     {
       return m_pElement[index];
     }
 
-    ElementType& operator[](uint32 index) { return m_pElement[index]; }
+    ElementType& operator[](uint64 index) { return m_pElement[index]; }
 
     ElementType* Data() { return m_pElement; }
 
@@ -346,9 +346,9 @@ K3D_COMMON_NS
 #endif
     }
 
-    uint32 m_ElementIndex;
-    uint32 m_ElementCount;
-    uint32 m_Capacity;
+    uint64 m_ElementIndex;
+    uint64 m_ElementCount;
+    uint64 m_Capacity;
     ElementType* m_pElement;
     TAllocator m_Allocator;
   };

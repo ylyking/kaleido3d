@@ -116,8 +116,8 @@ public:
     queue->SetName("GraphicsQueue");
 
     SwapChainDesc swapChainDesc = { PixelFormat::RGBA8UNorm, 800, 600, 2, true, PixelFormat::D32Float };
-    factory->CreateSwapchain(&swapChainDesc, queue.Get(), HostWindow()->GetHandle(), swapChain.GetAddressOf());
-    swapChain->SetName("DefaultSwapchain");
+    //factory->CreateSwapchain(&swapChainDesc, queue.Get(), HostWindow()->GetHandle(), swapChain.GetAddressOf());
+    //swapChain->SetName("DefaultSwapchain");
 
     BufferDesc bufferDesc{ BufferViewBit::VertexBuffer, StorageOption::Managed, 10 };
     device->CreateBuffer(&bufferDesc, buffer.GetAddressOf());
@@ -148,11 +148,6 @@ public:
 
     device->CreateComputePipeline(
       computeFunction.Get(), 
-      pipelineLayout.Get(), 
-      computePipeline.GetAddressOf());
-    
-    device->CreateComputePipeline(
-      computeFunction.Get(), 
       computePipeline1.GetAddressOf(), 
       computePipelineReflection.GetAddressOf());
 
@@ -163,11 +158,6 @@ public:
     swapChain->InitWithRenderPass(renderPass.Get());
 
     RenderPipelineDesc renderPipelineDesc = ngfxu::CreateDefaultRenderPipelineDesc();
-    device->CreateRenderPipeline(
-      &renderPipelineDesc, 
-      pipelineLayout.Get(), 
-      renderPass.Get(), 
-      renderPipeline.GetAddressOf());
 
     device->CreateRenderPipeline(
       &renderPipelineDesc,

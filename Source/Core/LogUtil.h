@@ -6,14 +6,13 @@
 #include <KTL/Singleton.hpp>
 #include <Interface/ILog.h>
 
-#include "Os.h"
 
 namespace k3d
 {
 	extern K3D_API void Log(ELogLevel const & Lv, const char* tag, const char *fmt, ...);
 }
 
-#ifndef K3DPLATFORM_OS_WIN
+#if !K3DPLATFORM_OS_WINDOWS
 #define __debugbreak __builtin_trap
 #endif
 

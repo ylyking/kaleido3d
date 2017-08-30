@@ -35,8 +35,8 @@ namespace k3d
 	public:
 		FileLogger()
 		{
-			kString name = GetEnv()->GetEnvValue(Environment::ENV_KEY_LOG_DIR) + KT("/") + GetEnv()->GetEnvValue(Environment::ENV_KEY_APP_NAME) + KT(".log");
-			m_LogFile.Open(name.c_str(), IOWrite);
+			String name = Os::Path::Join(GetEnv()->GetLogDir(), GetEnv()->GetInstanceName() + ".log");
+			m_LogFile.Open(name.CStr(), IOWrite);
 			m_Thread = new Os::Thread([this]()->void {
 				while (true)
 				{

@@ -2,7 +2,7 @@
 
 #include <Kaleido3D.h>
 #include <Core/Os.h>
-#include <Core/Bundle.h>
+//#include <Core/Bundle.h>
 #include <KTL/String.hpp>
 #include <KTL/Archive.hpp>
 #include <Core/WebSocket.h>

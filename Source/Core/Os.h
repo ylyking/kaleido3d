@@ -2,11 +2,16 @@
 #define __Os_h__
 
 #include <Config/OSHeaders.h>
+#if K3DPLATFORM_OS_LINUX
+#include <netinet/in.h>
+#endif
+
 #include <Interface/IIODevice.h>
 #include <KTL/String.hpp>
 #include <KTL/Functional.hpp>
 #include <functional>
 #include <map>
+
 
 /**
  * This module provides facilities on OS like:
@@ -23,7 +28,7 @@ public:
 
   bool Open(IOFlag flag);
   bool Open(const char* fileName, IOFlag flag);
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   bool Open(const WCHAR* fileName, IOFlag flag);
 #endif
   int64 GetSize();
@@ -44,7 +49,7 @@ public:
   static File* CreateIOInterface();
 
 private:
-#ifdef K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   HANDLE m_hFile;
 #else
   int m_fd;
@@ -63,7 +68,7 @@ public:
   int64 GetSize();
   //---------------------------------------------------------
   bool Open(const char* fileName, IOFlag mode);
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   bool Open(const WCHAR* fileName, IOFlag flag);
 #endif
   size_t Read(char* data_ptr, size_t len);
@@ -101,7 +106,7 @@ public:
   static MemMapFile* CreateIOInterface();
 
 private:
-#ifdef K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   HANDLE m_FileHandle;
   HANDLE m_FileMappingHandle;
 #else
@@ -112,21 +117,22 @@ private:
   kByte* m_pCur;
 };
 
+namespace Path
+{
+extern K3D_API k3d::String Join(k3d::String const& Path0, k3d::String const&Path1);
+extern K3D_API k3d::String Join(k3d::String const& Path0, k3d::String const&Path1, k3d::String const&Path2);
+extern K3D_API bool MakeDir(const char* name);
+extern K3D_API bool Exists(const char* name);
+extern K3D_API bool Copy(const char* src, const char* target);
+extern K3D_API bool Remove(const char* name);
+typedef void(*PFN_FileProcessRoutine)(const char* path, bool isDir);
+extern K3D_API bool Walk(const char* srcPath, PFN_FileProcessRoutine);
+}
+
 extern K3D_API int
 Exec(const ::k3d::kchar* cmd, ::k3d::kchar* const* argv);
-extern K3D_API bool
-MakeDir(const ::k3d::kchar* name);
-extern K3D_API bool
-Exists(const ::k3d::kchar* name);
 extern K3D_API void
 Sleep(uint32 ms);
-extern K3D_API bool
-Copy(const ::k3d::kchar* src, const ::k3d::kchar* target);
-extern K3D_API bool
-Remove(const ::k3d::kchar* name);
-typedef void (*PFN_FileProcessRoutine)(const ::k3d::kchar* path, bool isDir);
-extern K3D_API bool
-ListFiles(const ::k3d::kchar* srcPath, PFN_FileProcessRoutine);
 extern K3D_API uint32
 GetCpuCoreNum();
 extern K3D_API float*
@@ -339,7 +345,7 @@ private:
   sockaddr_in m_Addr;
 };
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 typedef UINT_PTR SocketHandle;
 #else
 typedef int SocketHandle;

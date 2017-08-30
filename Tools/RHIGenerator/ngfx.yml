@@ -250,6 +250,8 @@ protype:
                 vulkan: VK_IMAGE_VIEW_TYPE_3D_ARRAY
             - TexCube:
                 vulkan: VK_IMAGE_VIEW_TYPE_CUBE
+            - Buffer:
+                vulkan: VK_IMAGE_VIEW_TYPE_1D
 
     - fill mode:
         type: enum
@@ -672,48 +674,22 @@ protype:
           - name: count
             type: uint32_t
 
-    - bind table layout initializer:
+    - bind table encoder:
         type: interface
         inherit: ref counted<false>
         functions:
-            - add buffer:
+            - allocate:
                 params:
-                    - name: slot
-                      type: uint32_t
-                    - name: count
-                      type: uint32_t
-                    - name: visibility
-                      type: shader stage bit
-            - add texture:
-                params:
-                    - name: slot
-                      type: uint32_t
-                    - name: count
-                      type: uint32_t
-                    - name: visibility
-                      type: shader stage bit
-            - add sampler:
-                params:
-                    - name: slot
-                      type: uint32_t
-                    - name: visibility
-                      type: shader stage bit
-            - initialize:
-                params:
-                    - name: ppBindTableLayout
-                      type: bind table layout **
+                    - name: ppBindTable
+                      type: bind table **
                 return: result
-                    
-    - bind table layout:
-        type: interface
-        inherit: ref counted<false>
 
     - pipeline layout desc:
         type: struct
         comment: Description of Pipeline Layout (How to layout bindings)
         members:
-          - name: pShaderLayout
-            type: const bind table layout *
+          - name: pTableEncoders
+            type: const bind table encoder *
           - name: shaderLayoutCount
             type: uint32_t
 
@@ -913,6 +889,7 @@ protype:
             - array
             - pointer
             - texture
+            - sampler
             - bool
             - bool2
             - bool3
@@ -945,13 +922,31 @@ protype:
         functions:
             - get type:
                 return: data type
-        
+                
     - argument access:
         type: enum
         bitmask: true
         enums:
             - read only
             - write only
+
+    - argument desc:
+        type: struct
+        members:
+            - name: dataType
+              type: data type
+            - name: index
+              type: int32_t
+            - name: access
+              type: argument access
+            - name: arrayLength
+              type: int32_t
+            - name: textureDim
+              type: texture dimension
+            - name: bufferAlignment
+              type: int32_t
+            - name: stage
+              type: shader stage bit
 
     - variable:
         type: interface
@@ -968,6 +963,9 @@ protype:
                 return: uint32_t
             - active:
                 return: bool
+            - get stage:
+                return: shader type
+                const: true
 
     - struct type:
         type: interface
@@ -1026,9 +1024,11 @@ protype:
                       type: uint32_t
                 return: variable *
                 const: true
-            - get stage:
-                return: shader type
-                const: true
+            - merge:
+                params:
+                    - name: pReflection
+                      type: const pipeline reflection *
+                return: result
 
     - compile option:
         type: struct
@@ -1134,12 +1134,6 @@ protype:
     - pipeline layout:
         type: interface
         inherit: named object<false>
-        functions:
-            - create bind table:
-                params:
-                    - name: ppBindingTable
-                      type: bind table **
-                return: result
 
     - bind table:
         type: interface
@@ -1263,10 +1257,7 @@ protype:
                     - name: pQueue
                       type: command queue **
                 return: result
-            - create bind table layout initializer:
-                params:
-                    - name: ppBTLInitializer
-                      type: NotNull bind table layout initializer **
+
             - create pipeline layout:
                 params:
                     - name: pPipelineLayoutDesc
@@ -1274,45 +1265,27 @@ protype:
                     - name: ppPipelineLayout
                       type: pipeline layout **
                 return: result
-            - create bind table:
-                params:
-                    - name: pBindTableLayout
-                      type: NotNull const bind table layout *
-                    - name: ppBindingTable
-                      type: bind table **
-                return: result
-            - create render pipeline:
-                params:
-                    - name: pPipelineDesc
-                      type: NotNull const render pipeline desc *
-                    - name: pPipelineLayout
-                      type: Nullable pipeline layout *
-                    - name: pRenderPass
-                      type: Nullable render pass *
-                    - name: pPipelineState
-                      type: pipeline **
-                return: result
-                
-            - create render pipeline:
-                params:
-                    - name: pPipelineDesc
-                      type: NotNull const render pipeline desc *
-                    - name: pRenderPass
-                      type: Nullable render pass *
-                    - name: pPipelineState
-                      type: pipeline **
-                    - name: ppReflection
-                      type: NotNull pipeline reflection **
-                return: result
 
-            - create compute pipeline:
+            - make bind table encoder:
                 params:
-                    - name: pComputeFunction
-                      type: NotNull function *
-                    - name: pPipelineLayout
-                      type: Nullable pipeline layout *
-                    - name: ppPipeline
+                    - name: pArgumentDescs
+                      type: NotNull const argument desc *
+                    - name: argumentCount
+                      type: int32_t
+                    - name: ppBindingTableLayout
+                      type: bind table encoder **
+                return: result
+                
+            - create render pipeline:
+                params:
+                    - name: pPipelineDesc
+                      type: NotNull const render pipeline desc *
+                    - name: pRenderPass
+                      type: Nullable render pass *
+                    - name: pPipelineState
                       type: pipeline **
+                    - name: ppReflection
+                      type: NotNull pipeline reflection **
                 return: result
                 
             - create compute pipeline:
@@ -1323,6 +1296,16 @@ protype:
                       type: pipeline **
                     - name: ppReflection
                       type: NotNull pipeline reflection **
+                return: result
+                
+            - create compute pipeline:
+                params:
+                    - name: pComputeFunction
+                      type: NotNull const function *
+                    - name: ppPipelineLayout
+                      type: NotNull const pipeline layout *
+                    - name: ppPipeline
+                      type: NotNull pipeline **
                 return: result
 
             - create pipeline library:
@@ -1334,6 +1317,7 @@ protype:
                     - name: ppPipelineLibrary
                       type: pipeline library **
                 return: result
+
             - create library:
                 params:
                     - name: compileOption

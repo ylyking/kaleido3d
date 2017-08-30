@@ -8,6 +8,8 @@
 #define VK_USE_PLATFORM_WIN32_KHR 1
 #elif K3DPLATFORM_OS_ANDROID
 #define VK_USE_PLATFORM_ANDROID_KHR 1
+#elif K3DPLATFORM_OS_LINUX
+#define VK_USE_PLATFORM_XLIB_KHR 1
 #endif
 #include <vulkan/vulkan.h>
 #include <stdlib.h>

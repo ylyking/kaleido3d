@@ -4,7 +4,7 @@
 #include <Math/kMath.hpp>
 #include <memory>
 #include <Core/Window.h>
-#include <Core/MeshData.h>
+#include <Engine/Assets/MeshData.h>
 
 namespace render
 {

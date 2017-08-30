@@ -15,7 +15,7 @@
 namespace Os {
 File::File(const char* fileName)
   :
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   m_hFile(NULL)
   ,
 #else
@@ -30,7 +30,7 @@ File::File(const char* fileName)
 
 File::File()
   :
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   m_hFile(NULL)
   ,
 #else
@@ -57,7 +57,7 @@ File::Open(IOFlag flag)
 bool
 File::Open(const char* fileName, IOFlag flag)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   wchar_t name_buf[1024];
   ::k3d::StringUtil::CharToWchar(fileName, name_buf, sizeof(name_buf));
 
@@ -74,13 +74,22 @@ File::Open(const char* fileName, IOFlag flag)
                                         FALSE };
   DWORD createDisp = (flag & IOWrite) ? CREATE_ALWAYS : OPEN_EXISTING;
 
-  m_hFile = ::CreateFileW(name_buf, // file to open
-                          accessRights,
-                          shareMode,
-                          &securityAttrs,
-                          createDisp,
-                          FILE_ATTRIBUTE_NORMAL,
-                          NULL);
+  m_hFile =
+#if K3DPLATFORM_OS_WIN
+      ::CreateFileW(name_buf, // file to open
+                    accessRights,
+                    shareMode,
+                    &securityAttrs,
+                    createDisp,
+                    FILE_ATTRIBUTE_NORMAL,
+                    NULL);
+#else
+      CreateFile2(name_buf, // file to open
+          accessRights,
+          shareMode,
+          createDisp,
+          NULL);
+#endif
   if (m_hFile == INVALID_HANDLE_VALUE)
     return false;
 #else
@@ -133,8 +142,12 @@ int64
 File::GetSize()
 {
   int64 len = 0;
-#if K3DPLATFORM_OS_WIN
-  len = ::GetFileSize(m_hFile, NULL);
+#if K3DPLATFORM_OS_WINDOWS
+  BOOL ret = ::GetFileSizeEx(m_hFile, (PLARGE_INTEGER)&len);
+  if (ret != S_OK)
+  {
+      return -1;
+  }
 #else
   struct stat st;
   if (fstat(m_fd, &st) != 0)
@@ -153,7 +166,7 @@ File::IsEOF()
 size_t
 File::Read(char* data, size_t len)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   if (m_hFile == INVALID_HANDLE_VALUE)
     return size_t(-1);
   DWORD bytesToRead = (DWORD)len;
@@ -186,7 +199,7 @@ size_t
 File::Write(const void* data, size_t len)
 {
   size_t written = 0;
-#ifdef K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   WriteFile(m_hFile, data, (DWORD)len, (LPDWORD)&written, NULL);
 #else
   written = ::write(m_fd, data, len);
@@ -199,7 +212,7 @@ File::Write(const void* data, size_t len)
 bool
 File::Seek(size_t offset)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   m_CurOffset = ::SetFilePointer(m_hFile, (LONG)offset, NULL, 0);
 #else
   m_CurOffset = ::lseek(m_fd, offset, SEEK_SET);
@@ -210,7 +223,7 @@ File::Seek(size_t offset)
 bool
 File::Skip(size_t offset)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   m_CurOffset = ::SetFilePointer(m_hFile, (LONG)offset, NULL, 1);
 #else
   m_CurOffset = ::lseek(m_fd, offset, SEEK_CUR);
@@ -226,7 +239,7 @@ File::Flush()
 void
 File::Close()
 {
-#ifdef K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   if (m_hFile) {
     ::CloseHandle(m_hFile);
     m_hFile = NULL;
@@ -240,7 +253,7 @@ File::Close()
 uint64
 File::LastModified() const
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   FILETIME FileTime = {};
   GetFileTime(m_hFile, nullptr, nullptr, &FileTime);
   return FileTime.dwLowDateTime;
@@ -258,7 +271,7 @@ File::CreateIOInterface()
 
 MemMapFile::MemMapFile()
   :
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   m_FileHandle(NULL)
   , m_FileMappingHandle(NULL)
   ,
@@ -287,10 +300,11 @@ MemMapFile::Open(const char* fileName, IOFlag mode)
 {
   assert(mode == IORead);
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   wchar_t name_buf[1024];
   ::k3d::StringUtil::CharToWchar(fileName, name_buf, sizeof(name_buf));
   m_FileHandle =
+#if K3DPLATFORM_OS_WIN
     ::CreateFileW(name_buf,
                   GENERIC_READ,
                   FILE_SHARE_READ,
@@ -298,11 +312,18 @@ MemMapFile::Open(const char* fileName, IOFlag mode)
                   OPEN_EXISTING,
                   FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
                   NULL);
+#else
+      CreateFile2(name_buf, // file to open
+          GENERIC_READ,
+          FILE_SHARE_READ,
+          OPEN_EXISTING,
+          NULL);
+#endif
   if (m_FileHandle == INVALID_HANDLE_VALUE)
     return false;
 
-  m_szFile = ::GetFileSize(m_FileHandle, NULL);
-  if (m_szFile == INVALID_FILE_SIZE)
+  auto ret = ::GetFileSizeEx(m_FileHandle, (PLARGE_INTEGER)&m_szFile);
+  if (ret != S_OK && m_szFile == INVALID_FILE_SIZE)
     return false;
 
   m_FileMappingHandle =
@@ -336,23 +357,30 @@ MemMapFile::Open(const char* fileName, IOFlag mode)
   return true;
 }
 
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 bool
 MemMapFile::Open(const WCHAR* fileName, IOFlag flag)
 {
   m_FileHandle =
-    ::CreateFileW(fileName,
+#if K3DPLATFORM_OS_WIN
+      ::CreateFileW(fileName,
                   GENERIC_READ,
                   FILE_SHARE_READ,
                   NULL,
                   OPEN_EXISTING,
                   FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
                   NULL);
+#else
+      CreateFile2(fileName, // file to open
+          GENERIC_READ,
+          FILE_SHARE_READ,
+          OPEN_EXISTING,
+          NULL);
+#endif
   if (m_FileHandle == INVALID_HANDLE_VALUE)
     return false;
-
-  m_szFile = ::GetFileSize(m_FileHandle, NULL);
-  if (m_szFile == INVALID_FILE_SIZE)
+  auto ret = ::GetFileSizeEx(m_FileHandle, (PLARGE_INTEGER)&m_szFile);
+  if (ret != S_OK && m_szFile == INVALID_FILE_SIZE)
     return false;
 
   m_FileMappingHandle =
@@ -420,7 +448,7 @@ MemMapFile::Flush()
 void
 MemMapFile::Close()
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   if (m_pData) {
     UnmapViewOfFile(m_pData);
     m_pData = nullptr;
@@ -429,7 +457,7 @@ MemMapFile::Close()
     CloseHandle(m_FileMappingHandle);
     m_FileMappingHandle = NULL;
   }
-#else
+#elif K3DPLATFORM_OS_UNIX
   // TODO : need fix
   munmap(m_pData, m_szFile);
   close(m_Fd);
@@ -442,25 +470,183 @@ MemMapFile::CreateIOInterface()
   return new MemMapFile;
 }
 
+namespace Path
+{
+    using k3d::String;
+    String Join(String const&Path0, String const&Path1)
+    {
+        String RetPath(64);
+#if K3DPLATFORM_OS_WINDOWS
+        RetPath.AppendSprintf("%s\\%s", Path0.CStr(), Path1.CStr());
+#else
+        RetPath.AppendSprintf("%s/%s", Path0.CStr(), Path1.CStr());
+#endif
+        return RetPath;
+    }
+
+    String Join(String const&Path0, String const&Path1, String const&Path2)
+    {
+        String RetPath(64);
+#if K3DPLATFORM_OS_WINDOWS
+        RetPath.AppendSprintf("%s\\%s\\%s", Path0.CStr(), Path1.CStr(), Path2.CStr());
+#else
+        RetPath.AppendSprintf("%s/%s/%s", Path0.CStr(), Path1.CStr(), Path2.CStr());
+#endif
+        return RetPath;
+    }
+
+    bool MakeDir(const char* name)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+        auto ret = CreateDirectoryA(name, nullptr);
+        return TRUE == ret;
+#else
+        int status = mkdir(name, S_IRWXU);
+        return status == 0;
+#endif
+    }
+
+    bool Exists(const char* name)
+    {
+#if K3DPLATFORM_OS_WIN
+        return TRUE == PathFileExistsA(name);
+#elif K3DPLATFORM_OS_UNIX
+        return ::opendir(name) != nullptr;
+#endif
+    }
+
+    bool Remove(const char* lpszDir)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+        if (NULL == lpszDir || '\0' == lpszDir[0]) {
+            return FALSE;
+        }
+
+        WIN32_FIND_DATAA wfd = { 0 };
+        CHAR szFile[MAX_PATH] = { 0 };
+        CHAR szDelDir[MAX_PATH] = { 0 };
+        //MultiByteToWideChar(CP_UTF8, 0, lpszDir, strlen(lpszDir), szDelDir, MAX_PATH);
+        strcpy(szDelDir, lpszDir);
+        if (szDelDir[strlen(szDelDir) - 1] != '\\') {
+            _snprintf(szDelDir, _countof(szDelDir) - 1, "%s\\", lpszDir);
+        }
+        else {
+            strncpy(szDelDir, szDelDir, _countof(szDelDir) - 1);
+        }
+        _snprintf(szFile, _countof(szFile) - 1, "%s*.*", szDelDir);
+        HANDLE hFindFile = FindFirstFileA(szFile, &wfd);
+        if (INVALID_HANDLE_VALUE == hFindFile) {
+            return FALSE;
+        }
+        do {
+            if (strcmp(wfd.cFileName, ".") == 0 ||
+                strcmp(wfd.cFileName, "..") == 0) {
+                continue;
+            }
+
+            _snprintf(
+                szFile, _countof(szFile) - 1, "%s%s", szDelDir, wfd.cFileName);
+            if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                Remove(szFile);
+            }
+            else {
+                DeleteFileA(szFile);
+            }
+
+        } while (FindNextFileA(hFindFile, &wfd));
+
+        FindClose(hFindFile);
+        RemoveDirectoryA(szDelDir);
+        return true;
+#else
+        DIR* d = opendir(lpszDir);
+        size_t path_len = strlen(lpszDir);
+        int r = -1;
+        if (d) {
+            struct dirent* p;
+            r = 0;
+            while (!r && (p = readdir(d))) {
+                int r2 = -1;
+                char* buf;
+                size_t len;
+
+                if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
+                    continue;
+                }
+
+                len = path_len + strlen(p->d_name) + 2;
+                buf = (char*)calloc(1, len);
+                if (buf) {
+                    struct stat statbuf;
+                    snprintf(buf, len, "%s/%s", lpszDir, p->d_name);
+                    if (!stat(buf, &statbuf)) {
+                        if (S_ISDIR(statbuf.st_mode)) {
+                            r2 = Remove(buf);
+                        }
+                        else {
+                            r2 = unlink(buf);
+                        }
+                    }
+                }
+                r = r2;
+            }
+            closedir(d);
+        }
+        if (!r) {
+            r = rmdir(lpszDir);
+        }
+        return r != -1;
+#endif
+    }
+
+    bool Walk(const char* srcPath, PFN_FileProcessRoutine pFn)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+        if (pFn == nullptr)
+            return false;
+        WIN32_FIND_DATAA ffd;
+        HANDLE hFind = FindFirstFileA(srcPath, &ffd);
+        if (INVALID_HANDLE_VALUE == hFind) {
+            return false;
+        }
+        do {
+            if (strcmp(ffd.cFileName, ".") != 0 && strcmp(ffd.cFileName, "..") != 0) {
+                if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                    pFn(ffd.cFileName, true);
+                }
+                else {
+                    pFn(ffd.cFileName, false);
+                }
+            }
+        } while (FindNextFileA(hFind, &ffd) != 0);
+        FindClose(hFind);
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    bool Copy(const char* src, const char* target)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+        return TRUE == CopyFile2((PCWSTR)src, (PCWSTR)target, nullptr);
+#else
+        return false;
+#endif
+    }
+}
+
 int
 Exec(const ::k3d::kchar* cmd, ::k3d::kchar* const* argv)
 {
+#if K3DPLATFORM_OS_WINDOWS
 #if K3DPLATFORM_OS_WIN
   return ::_wexecv(cmd, argv);
 #else
-  return ::execv(cmd, argv);
+  return -1;
 #endif
-}
-
-bool
-MakeDir(const ::k3d::kchar* name)
-{
-#if K3DPLATFORM_OS_WIN
-  auto ret = CreateDirectoryW(name, nullptr);
-  return TRUE == ret;
 #else
-  int status = mkdir(name, S_IRWXU);
-  return status == 0;
+  return ::execv(cmd, argv);
 #endif
 }
 
@@ -469,177 +655,49 @@ uint64 GetTicks()
 #if K3DPLATFORM_OS_WIN
   return ::GetTickCount64();
 #else
-  return 0UL;
-#endif
-}
-
-bool
-Exists(const ::k3d::kchar* name)
-{
-#if K3DPLATFORM_OS_WIN
-  return TRUE == PathFileExistsW(name);
-#else
-  return false;
-#endif
-}
-
-bool
-Copy(const ::k3d::kchar* src, const ::k3d::kchar* target)
-{
-#if K3DPLATFORM_OS_WIN
-  return TRUE == CopyFileW(src, target, FALSE);
-#else
-  return false;
-#endif
-}
-
-bool
-Remove(const ::k3d::kchar* lpszDir)
-{
-#if K3DPLATFORM_OS_WIN
-  if (NULL == lpszDir || L'\0' == lpszDir[0]) {
-    return FALSE;
-  }
-  if (PathFileExistsW(lpszDir) != TRUE) {
-    return FALSE;
-  }
-  WIN32_FIND_DATAW wfd = { 0 };
-  WCHAR szFile[MAX_PATH] = { 0 };
-  WCHAR szDelDir[MAX_PATH] = { 0 };
-  wcscpy(szDelDir, lpszDir);
-  if (lpszDir[wcslen(lpszDir) - 1] != L'\\') {
-    _snwprintf(szDelDir, _countof(szDelDir) - 1, KT("%s\\"), lpszDir);
-  } else {
-    wcsncpy(szDelDir, lpszDir, _countof(szDelDir) - 1);
-  }
-  _snwprintf(szFile, _countof(szFile) - 1, KT("%s*.*"), szDelDir);
-  HANDLE hFindFile = FindFirstFileW(szFile, &wfd);
-  if (INVALID_HANDLE_VALUE == hFindFile) {
-    return FALSE;
-  }
-  do {
-    if (wcscmp(wfd.cFileName, KT(".")) == 0 ||
-        wcscmp(wfd.cFileName, KT("..")) == 0) {
-      continue;
-    }
-
-    _snwprintf(
-      szFile, _countof(szFile) - 1, KT("%s%s"), szDelDir, wfd.cFileName);
-    if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-      Remove(szFile);
-    } else {
-      DeleteFileW(szFile);
-    }
-
-  } while (FindNextFileW(hFindFile, &wfd));
-
-  FindClose(hFindFile);
-  RemoveDirectoryW(szDelDir);
-  return true;
-#else
-  DIR* d = opendir(lpszDir);
-  size_t path_len = strlen(lpszDir);
-  int r = -1;
-  if (d) {
-    struct dirent* p;
-    r = 0;
-    while (!r && (p = readdir(d))) {
-      int r2 = -1;
-      char* buf;
-      size_t len;
-
-      if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
-        continue;
-      }
-
-      len = path_len + strlen(p->d_name) + 2;
-      buf = (char*)calloc(1, len);
-      if (buf) {
-        struct stat statbuf;
-        snprintf(buf, len, "%s/%s", lpszDir, p->d_name);
-        if (!stat(buf, &statbuf)) {
-          if (S_ISDIR(statbuf.st_mode)) {
-            r2 = Remove(buf);
-          } else {
-            r2 = unlink(buf);
-          }
-        }
-      }
-      r = r2;
-    }
-    closedir(d);
-  }
-  if (!r) {
-    r = rmdir(lpszDir);
-  }
-  return r != -1;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 #endif
 }
 
 void
 Sleep(uint32 ms)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   ::Sleep(ms);
 #else
   ::usleep(ms * 1000);
 #endif
 }
 
-bool
-ListFiles(const ::k3d::kchar* srcPath, PFN_FileProcessRoutine pFn)
-{
-#if K3DPLATFORM_OS_WIN
-  if (pFn == nullptr)
-    return false;
-  WIN32_FIND_DATAW ffd;
-  HANDLE hFind = FindFirstFileW(srcPath, &ffd);
-  if (INVALID_HANDLE_VALUE == hFind) {
-    return false;
-  }
-  do {
-    if (wcscmp(ffd.cFileName, L".") != 0 && wcscmp(ffd.cFileName, L"..") != 0) {
-      if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-        pFn(ffd.cFileName, true);
-      } else {
-        pFn(ffd.cFileName, false);
-      }
-    }
-  } while (FindNextFileW(hFind, &ffd) != 0);
-  FindClose(hFind);
-  return true;
-#else
-  return false;
-#endif
-}
-
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 static SYSTEM_INFO sSysInfo = {};
 #endif
 
 uint32
 GetCpuCoreNum()
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   if (sSysInfo.dwNumberOfProcessors == 0) {
     ::GetSystemInfo(&sSysInfo);
   }
   return sSysInfo.dwNumberOfProcessors;
-#else
+#elif K3DPLATFORM_OS_UNIX
   return sysconf(_SC_NPROCESSORS_CONF);
 #endif
 }
 
 struct MutexPrivate
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   CRITICAL_SECTION CS;
 #else
   pthread_mutex_t mMutex;
 #endif
   MutexPrivate()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     InitializeCriticalSection(&CS);
 #else
     pthread_mutex_init(&mMutex, NULL);
@@ -648,7 +706,7 @@ struct MutexPrivate
 
   ~MutexPrivate()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     DeleteCriticalSection(&CS);
 #else
     pthread_mutex_destroy(&mMutex);
@@ -657,7 +715,7 @@ struct MutexPrivate
 
   void Lock()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     EnterCriticalSection(&CS);
 #else
     pthread_mutex_lock(&mMutex);
@@ -665,7 +723,7 @@ struct MutexPrivate
   }
   void UnLock()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     LeaveCriticalSection(&CS);
 #else
     pthread_mutex_unlock(&mMutex);
@@ -698,14 +756,14 @@ Mutex::UnLock()
 
 struct ConditionVariablePrivate
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   CONDITION_VARIABLE CV;
 #else
   pthread_cond_t mCond;
 #endif
   ConditionVariablePrivate()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     InitializeConditionVariable(&CV);
 #else
     pthread_cond_init(&mCond, NULL);
@@ -713,7 +771,7 @@ struct ConditionVariablePrivate
   }
   ~ConditionVariablePrivate()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
 #else
     pthread_cond_destroy(&mCond);
 #endif
@@ -721,7 +779,7 @@ struct ConditionVariablePrivate
 
   void Wait(MutexPrivate* mutex, uint32 time)
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     ::SleepConditionVariableCS(&CV, &(mutex->CS), time);
 #else
     pthread_cond_wait(&mCond, &mutex->mMutex);
@@ -729,7 +787,7 @@ struct ConditionVariablePrivate
   }
   void Notify()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     ::WakeConditionVariable(&CV);
 #else
     pthread_cond_signal(&mCond);
@@ -737,7 +795,7 @@ struct ConditionVariablePrivate
   }
   void NotifyAll()
   {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     ::WakeAllConditionVariable(&CV);
 #else
     pthread_cond_broadcast(&mCond);
@@ -807,7 +865,7 @@ Thread::SleepForMilliSeconds(uint32_t millisecond)
 uint32_t
 Thread::GetId()
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   return ::GetCurrentThreadId();
 #else
   return (uint64_t)pthread_self();
@@ -870,7 +928,7 @@ void SetThreadName(DWORD dwThreadID, const char* threadName) {
 
 void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closure)
 {
-#if defined(K3DPLATFORM_OS_WIN) || defined(_WIN32)
+#if K3DPLATFORM_OS_WINDOWS
     if (nullptr == m_ThreadHandle) {
       DWORD threadId;
       m_ThreadHandle = ::CreateThread(
@@ -912,7 +970,7 @@ void
 Thread::Join()
 {
   if (m_ThreadHandle != nullptr) {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
     ::WaitForSingleObject(m_ThreadHandle, INFINITE);
 #else
     void* ret;
@@ -946,7 +1004,7 @@ Thread::GetName()
 k3d::String
 Thread::GetCurrentThreadName()
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   uint32 tid = (uint32)::GetCurrentThreadId();
   if (s_ThreadMap[tid] != nullptr) {
     return s_ThreadMap[tid]->GetName();
@@ -992,6 +1050,7 @@ Thread::Run(void* data)
 */
 IPv4Address::IPv4Address(const char* ip)
 {
+#if !K3DPLATFORM_OS_WINUWP
   ::memset(&m_Addr, 0, sizeof(m_Addr));
   m_Addr.sin_family = AF_INET;
 
@@ -1015,12 +1074,13 @@ IPv4Address::IPv4Address(const char* ip)
   std::string host = ipStr.substr(0, pos);
   std::string port = ipStr.substr(pos + 1, ipStr.length());
   m_Addr.sin_port = htons((u_short)(::atoi(port.c_str())));
+#endif
 #if K3DPLATFORM_OS_WIN
   if (host != "")
     m_Addr.sin_addr.S_un.S_addr = ::inet_addr(host.c_str());
   else
     m_Addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-#else
+#elif K3DPLATFORM_OS_UNIX
   ::inet_pton(AF_INET, ipbuff, &m_Addr.sin_addr);
 #endif
   //}
@@ -1032,7 +1092,9 @@ IPv4Address::IPv4Address(const char* ip)
 void
 IPv4Address::SetIpPort(uint32 port)
 {
+#if !K3DPLATFORM_OS_WINUWP
   m_Addr.sin_port = htons((u_short)port);
+#endif
 }
 
 IPv4Address*
@@ -1095,7 +1157,7 @@ Socket::SetBlocking(bool block)
 #if K3DPLATFORM_OS_WIN
   unsigned long ul = block ? 0 : 1;
   ioctlsocket(m_SockFd, FIONBIO, &ul);
-#else
+#elif K3DPLATFORM_OS_UNIX
   int flag = fcntl(m_SockFd, F_GETFL, 0);
   flag = block ? (flag & ~O_NONBLOCK) : (flag | O_NONBLOCK);
   fcntl(m_SockFd, F_SETFL, flag);
@@ -1106,34 +1168,43 @@ void
 Socket::Connect(IPv4Address const& ipAddr)
 {
   if (!IsValid())
-    return;
+      return;
+#if !K3DPLATFORM_OS_WINUWP
   int rm =
     ::connect(m_SockFd, (sockaddr*)&ipAddr.m_Addr, sizeof(ipAddr.m_Addr));
   assert(rm >= 0);
+#else
+  //IDatagramSocket
+#endif
 }
 
 void
 Socket::Listen(int maxConn)
 {
+#if !K3DPLATFORM_OS_WINUWP
   int ret = ::listen(m_SockFd, maxConn);
   assert(ret != -1);
+#endif
 }
 
 void
 Socket::Bind(IPv4Address const& ipAddr)
 {
+#if !K3DPLATFORM_OS_WINUWP
   int ret = ::bind(m_SockFd, (sockaddr*)&ipAddr.m_Addr, sizeof(ipAddr.m_Addr));
   assert(ret != -1);
+#endif
 }
 
 SocketHandle
 Socket::Accept(IPv4Address& ipAddr)
 {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WINDOWS
   int len = sizeof(SOCKADDR);
 #else
   socklen_t len = sizeof(sockaddr);
 #endif
+
   return ::accept(m_SockFd, (sockaddr*)&ipAddr.m_Addr, &len);
 }
 
@@ -1161,8 +1232,10 @@ Socket::Create()
 {
   if (IsValid())
     return;
+#if !K3DPLATFORM_OS_WINUWP
   m_SockFd = ::socket(
     AF_INET, m_SockType == SockType::TCP ? SOCK_STREAM : SOCK_DGRAM, 0);
+#endif
 }
 
 void
@@ -1172,7 +1245,7 @@ Socket::Close()
 #if K3DPLATFORM_OS_WIN
     ::closesocket(m_SockFd);
     m_SockFd = INVALID_SOCKET;
-#else
+#elif K3DPLATFORM_OS_UNIX
     close(m_SockFd);
     m_SockFd = -1;
 #endif
@@ -1181,7 +1254,7 @@ Socket::Close()
 
 //========================================================
 namespace RAII {
-#if K3DPLATFORM_OS_WIN
+#if K3DPLATFORM_OS_WIN && !K3DPLATFORM_OS_WINUWP
 struct SocketInitializer
 {
   SocketInitializer()
