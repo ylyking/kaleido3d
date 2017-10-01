@@ -4,7 +4,7 @@
 #ifdef min
 #undef min
 #endif
-#include "Utils/StringUtils.h"
+
 #include <algorithm>
 #include <regex>
 
@@ -59,7 +59,7 @@ File::Open(const char* fileName, IOFlag flag)
 {
 #if K3DPLATFORM_OS_WINDOWS
   wchar_t name_buf[1024];
-  ::k3d::StringUtil::CharToWchar(fileName, name_buf, sizeof(name_buf));
+  ::MultiByteToWideChar(CP_ACP, 0, fileName, (int)strlen(fileName) + 1, name_buf, 1024);
 
   DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
   int accessRights = 0;
@@ -302,7 +302,7 @@ MemMapFile::Open(const char* fileName, IOFlag mode)
 
 #if K3DPLATFORM_OS_WINDOWS
   wchar_t name_buf[1024];
-  ::k3d::StringUtil::CharToWchar(fileName, name_buf, sizeof(name_buf));
+  ::MultiByteToWideChar(CP_ACP, 0, fileName, (int)strlen(fileName) + 1, name_buf, 1024);
   m_FileHandle =
 #if K3DPLATFORM_OS_WIN
     ::CreateFileW(name_buf,
@@ -469,6 +469,56 @@ MemMapFile::CreateIOInterface()
 {
   return new MemMapFile;
 }
+
+struct LibraryPrivate
+{
+#if K3DPLATFORM_OS_WINDOWS
+    HMODULE Library;
+#else
+    void*   Library;
+#endif
+    LibraryPrivate() : Library(nullptr) {}
+
+    ~LibraryPrivate()
+    {
+        if (Library)
+        {
+#if K3DPLATFORM_OS_WINDOWS
+            ::FreeLibrary(Library);
+#else
+            ::dlclose(Library);
+#endif
+            Library = nullptr;
+        }
+    }
+
+    bool Load(const char* path)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+#if K3DPLATFORM_OS_WIN
+        Library = LoadLibraryA(path);
+#else
+        WCHAR WPath[2048] = { 0 };
+        MultiByteToWideChar(CP_UTF8, 0, path, strlen(path), WPath, 2048);
+        Library = LoadPackagedLibrary(WPath, 0);
+#endif
+#else
+        Library = ::dlopen(path, RTLD_LAZY);
+#endif
+        return Library != NULL;
+    }
+
+    void* Resolve(const char* symbol)
+    {
+#if K3DPLATFORM_OS_WINDOWS
+        return ::GetProcAddress(Library, symbol);
+#else
+        return ::dlsym(Library, symbol);
+#endif
+    }
+};
+
+
 
 namespace Path
 {
@@ -840,8 +890,19 @@ ConditionVariable::NotifyAll()
 }
 
 #define DEFAULT_THREAD_STACK_SIZE 2048
-std::map<uint32, Thread*> Thread::s_ThreadMap;
 
+__INTERNAL_THREAD_ROUTINE_RETURN Thread::RunOnThread(void* Thr)
+{
+  Thread* SelfThr = static_cast<Thread*>(Thr);
+  // Set ThreadName
+  SetCurrentThreadName(SelfThr->GetName());
+  // Run
+  SelfThr->m_ThreadFunc(SelfThr->m_ThreadClosure);
+  SelfThr->m_ThreadStatus = ThreadStatus::Finish;
+  return 0;
+}
+  
+  
 Thread::Thread(k3d::String const& name, ThreadPriority priority)
   : m_ThreadName(name)
   , m_ThreadPriority(priority)
@@ -856,11 +917,6 @@ Thread::SleepForMilliSeconds(uint32_t millisecond)
 {
   Os::Sleep(millisecond);
 }
-
-/*void Thread::Yield()
-{
-::Sleep(0);
-}*/
 
 uint32_t
 Thread::GetId()
@@ -883,11 +939,16 @@ Thread::~Thread()
   {
 #if defined(K3DPLATFORM_OS_WIN)
     uint32 Tid = ::GetThreadId(m_ThreadHandle);
-    if (s_ThreadMap.find(Tid) != s_ThreadMap.end())
-    {
-      s_ThreadMap.erase(Tid);
-    }
+    //if (s_ThreadMap.find(Tid) != s_ThreadMap.end())
+    //{
+    //  s_ThreadMap.erase(Tid);
+    //}
 #endif
+    if(m_ThreadClosure)
+    {
+      delete m_ThreadClosure;
+      m_ThreadClosure = nullptr;
+    }
   }
 }
 
@@ -928,14 +989,16 @@ void SetThreadName(DWORD dwThreadID, const char* threadName) {
 
 void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closure)
 {
+    m_ThreadFunc = Routine;
+    m_ThreadClosure = Closure;
 #if K3DPLATFORM_OS_WINDOWS
     if (nullptr == m_ThreadHandle) {
       DWORD threadId;
       m_ThreadHandle = ::CreateThread(
         nullptr,
         m_StackSize,
-        reinterpret_cast<LPTHREAD_START_ROUTINE>(Routine),
-        reinterpret_cast<LPVOID>(Closure),
+        reinterpret_cast<LPTHREAD_START_ROUTINE>(Thread::RunOnThread),
+        reinterpret_cast<LPVOID>(this),
         0,
         &threadId);
       {
@@ -943,7 +1006,7 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
         DWORD tid = ::GetThreadId(m_ThreadHandle);
         m_ThreadName.AppendSprintf(" #%d", tid);
         SetThreadName(threadId, m_ThreadName.CStr());
-        s_ThreadMap[tid] = this;
+//        s_ThreadMap[tid] = this;
       }
     }
 #else
@@ -952,11 +1015,10 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
       pthread_attr_t attr;
       pthread_attr_init(&attr);
       pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-      pthread_create((pthread_t*)&m_ThreadHandle, nullptr, Routine, Closure);
+      pthread_create((pthread_t*)&m_ThreadHandle, nullptr, Thread::RunOnThread, this);
 #if K3DPLATFORM_OS_ANDROID
-      pthread_setname_np((pthread_t)m_ThreadHandle, m_ThreadName.c_str());
+      pthread_setname_np((pthread_t)m_ThreadHandle, m_ThreadName.CStr());
 #endif
-      s_ThreadMap[(uint64)m_ThreadHandle] = this;
     }
 #endif
 }
@@ -1006,10 +1068,6 @@ Thread::GetCurrentThreadName()
 {
 #if K3DPLATFORM_OS_WINDOWS
   uint32 tid = (uint32)::GetCurrentThreadId();
-  if (s_ThreadMap[tid] != nullptr) {
-    return s_ThreadMap[tid]->GetName();
-  }
-
   return "Main";
 #elif K3DPLATFORM_OS_ANDROID
   char name[32];
@@ -1017,17 +1075,16 @@ Thread::GetCurrentThreadName()
   return name;
 #else
   pthread_t tid = pthread_self();
-  if (s_ThreadMap[reinterpret_cast<uint64>(tid)] != nullptr) {
-    return s_ThreadMap[reinterpret_cast<uint64>(tid)]->GetName();
-  }
-
   return "Anonymous Thread";
 #endif
 }
 
 void
-Thread::SetCurrentThreadName(std::string const& name)
+Thread::SetCurrentThreadName(k3d::String const& name)
 {
+#if K3DPLATFORM_OS_APPLE
+    pthread_setname_np(name.CStr());
+#endif
 }
 /*
 void*
@@ -1268,5 +1325,18 @@ struct SocketInitializer
 
 SocketInitializer globalInitializer;
 #endif
+}
+LibraryLoader::LibraryLoader(const char* libPath)
+    : d(new LibraryPrivate)
+{
+    d->Load(libPath);
+}
+LibraryLoader::~LibraryLoader()
+{
+    delete d;
+}
+void* LibraryLoader::ResolveSymbol(const char* entryName)
+{
+    return d->Resolve(entryName);
 }
 }

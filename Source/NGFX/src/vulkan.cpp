@@ -524,6 +524,7 @@ VkPolygonMode ConvertFillModeToVulkanEnum(FillMode const& e) {
     }
     return VK_POLYGON_MODE_MAX_ENUM;
 }
+
 VkCullModeFlagBits ConvertCullModeToVulkanEnum(CullMode const& e) {
     switch (e) {
     case CullMode::None:
@@ -718,12 +719,12 @@ namespace spirv_cross
                 auto&    typeInfo = m_Reflector->get_type(res.type_id);
                 bool     isPushConstant = (spv::StorageClassPushConstant == m_Reflector->get_storage_class(res.id));
                 bool     isBlock = (0 != (m_Reflector->get_decoration_mask(typeInfo.self) & kBlockMask));
-                uint32 	 typeId = ((!isPushConstant && isBlock) ? res.type_id : res.id);
+                //uint32 	 typeId = ((!isPushConstant && isBlock) ? res.type_id : res.id);
 
                 //auto            bindingType = isPushConstant ? NGFX_SHADER_BIND_CONSTANTS : NGFX_SHADER_BIND_BLOCK;
                 std::string     bindingName = m_Reflector->get_name(res.id);
-                uint32			bindingNumber = m_Reflector->get_decoration(res.id, spv::DecorationBinding);
-                uint32			bindingSet = m_Reflector->get_decoration(res.id, spv::DecorationDescriptorSet);
+                //uint32			bindingNumber = m_Reflector->get_decoration(res.id, spv::DecorationBinding);
+                //uint32			bindingSet = m_Reflector->get_decoration(res.id, spv::DecorationDescriptorSet);
                 //NGFXShaderType  bindingStage = shaderType;
 
                 for (uint32 index = 0; index < typeInfo.member_types.size(); ++index) {
@@ -876,21 +877,6 @@ namespace spirv_cross
     }
 }
 
-/*
-template <class TNgfxObj>
-class TDeviceChild : public TNgfxObj
-{
-public:
-};
-*/
-
-/*
-class VulkanDescriptorSet
-{
-public:
-  VkDescriptorSet Handle = VK_NULL_HANDLE;
-};
-*/
 using ByteCode = vector<uint32_t>;
 
 class VulkanDevice;
@@ -1050,6 +1036,16 @@ class VulkanRenderPass : public RenderPass
 public:
     VulkanRenderPass(VulkanDevice* pDevice, const RenderPassDesc* pDesc);
     ~VulkanRenderPass() override;
+
+    Result MakeFrameBuffer(
+        const TextureView ** pRenderTargetViews, int32_t viewCount, 
+        int32_t width, int32_t height, int32_t layers, 
+        FrameBuffer ** ppFramebuffer) override;
+    Result MakeRenderPipeline(
+        NotNull const RenderPipelineDesc * pPipelineDesc, 
+        NotNull const PipelineLayout * pPipelineLayout, 
+        Pipeline ** ppPipeline) override;
+
     VulkanDevice* Device;
     VkRenderPass Handle = VK_NULL_HANDLE;
 };
@@ -1155,7 +1151,7 @@ public:
 class VulkanRenderPipeline : public TPipeline<RenderPipeline>
 {
 public:
-    VulkanRenderPipeline(VulkanDevice* pDevice, const RenderPipelineDesc* pDesc, RenderPass * pRenderPass, PipelineLayout * pLayout);
+    VulkanRenderPipeline(VulkanDevice* pDevice, const RenderPipelineDesc* pDesc, RenderPass * pRenderPass, const PipelineLayout * pLayout);
     ~VulkanRenderPipeline() override;
     Result GetDesc(RenderPipelineDesc * pDesc) override;
 
@@ -1201,19 +1197,22 @@ public:
 
 class VulkanTextureView;
 // Correspond to VkFramebuffer And TextureViews
-class VulkanDrawable : public Drawable
+class VulkanDrawable : public FrameBuffer
 {
 public:
     VulkanDrawable(VulkanDevice* pDevice, const FrameBufferDesc* pDesc);
+    VulkanDrawable(VulkanDevice* pDevice, const VulkanRenderPass * pRenderPass,
+        const TextureView ** pRenderTargetViews, int32_t viewCount,
+        int32_t width, int32_t height, int32_t layers);
+    
     ~VulkanDrawable() override;
 
-    struct Texture * Texture() override;
+    Bool32 CompatWith(const RenderPass * pRenderPass) override { return false; }
 
     VulkanDevice* Device;
     VkFramebuffer Handle = VK_NULL_HANDLE;
-    VulkanTextureView* DepthStencilView = nullptr;
-    VulkanTextureView* MainColorView = nullptr;
-    std::vector<VulkanTextureView*> OtherAttachments;
+    // transient
+    std::vector<VulkanTextureView*> Attachments;
 };
 
 Result VulkanCommandBuffer::CreateRenderCommandEncoder(Drawable* pDrawable, RenderPass* pRenderPass, RenderCommandEncoder ** ppEncoder)
@@ -1282,6 +1281,7 @@ struct ResTrait<Buffer>
     typedef VkBufferCreateInfo CreateInfo;
     typedef VkBufferViewCreateInfo ViewCreateInfo;
     typedef VkDescriptorBufferInfo DescriptorInfo;
+    typedef BufferDesc CreateDesc;
     static decltype(vkCreateBufferView)* CreateView;
     static decltype(vkDestroyBufferView)* DestroyView;
     static decltype(vkCreateBuffer)* Create;
@@ -1301,6 +1301,7 @@ struct ResTrait<Texture>
     typedef VkImageCreateInfo CreateInfo;
     typedef VkImageViewCreateInfo ViewCreateInfo;
     typedef VkDescriptorImageInfo DescriptorInfo;
+    typedef TextureDesc CreateDesc;
     static decltype(vkCreateImageView)* CreateView;
     static decltype(vkDestroyImageView)* DestroyView;
     static decltype(vkCreateImage)* Create;
@@ -1344,9 +1345,14 @@ class TResource : public TRHIResObj
 public:
     using TObj = typename ResTrait<TRHIResObj>::Obj;
     using ResInfo = typename ResTrait<TRHIResObj>::CreateInfo;
+    using Desc = typename ResTrait<TRHIResObj>::CreateDesc;
     using Super = TResource<TRHIResObj>;
 
-    TResource(VulkanDevice* Device) : OwningDevice(Device) {}
+    TResource(VulkanDevice* Device, const Desc* pDesc) : OwningDevice(Device) 
+    {
+        memcpy(&ResDesc, pDesc, sizeof(Desc));
+    }
+
     virtual ~TResource();
 
     void * Map(uint64_t offset, uint64_t size) override;
@@ -1355,13 +1361,13 @@ public:
     Result Create(ResInfo const& Info, StorageOption const& Option);
     TObj GetHandle() const { return Handle; }
 
-    VulkanDevice* OwningDevice;
-    ResInfo Info = {};
-
+    VulkanDevice*           OwningDevice;
+    ResInfo                 Info = {};
 protected:
-    VkMappedMemoryRange MappedMemoryRange = {};
-    VmaMemoryRequirements MemReq = {};
-    TObj Handle = VK_NULL_HANDLE;
+    VkMappedMemoryRange     MappedMemoryRange = {};
+    VmaMemoryRequirements   MemReq = {};
+    Desc                    ResDesc = {};
+    TObj                    Handle = VK_NULL_HANDLE;
 };
 
 class VulkanBuffer : public TResource<Buffer>
@@ -1524,7 +1530,6 @@ public:
     Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) override;
     Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) override;
     Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) override;
-    Result CreateFrameBuffer(const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget) override;
     Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) override;
     Result CreateBuffer(const BufferDesc* desc, Buffer ** pBuffer) override;
     Result CreateTexture(const TextureDesc * desc, Texture ** pTexture) override;
@@ -1619,7 +1624,7 @@ void TResource<TRHIResObj>::UnMap()
 template<class TRHIResObj>
 TResource<TRHIResObj>::~TResource()
 {
-    ResTrait<TRHIResObj>::Destroy(OwningDevice->Handle, Handle, VULKAN_ALLOCATOR);
+    ResTrait<TRHIResObj>::vmaDestroy(OwningDevice->MemoryAllocator, Handle);
 }
 
 template<class TRHIResObj>
@@ -1645,7 +1650,7 @@ Result TResource<TRHIResObj>::Create(ResInfo const & _Info, StorageOption const 
 }
 
 VulkanBuffer::VulkanBuffer(VulkanDevice * pDevice, const BufferDesc* pDesc)
-    : Super(pDevice)
+    : Super(pDevice, pDesc)
 {
     Info = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     Info.size = pDesc->size;
@@ -1677,6 +1682,9 @@ VulkanBuffer::~VulkanBuffer()
 
 Result VulkanBuffer::GetDesc(BufferDesc * pDesc)
 {
+    if (!pDesc)
+        return Result::ParamError;
+    memcpy(pDesc, &ResDesc, sizeof(ResDesc));
     return Result::Ok;
 }
 
@@ -1725,12 +1733,14 @@ VulkanBufferView::~VulkanBufferView()
 
 Result VulkanBuffer::CreateView(const BufferViewDesc * pDesc, BufferView ** ppView)
 {
+    if (!pDesc || !ppView)
+        return Result::ParamError;
     *ppView = new VulkanBufferView(pDesc, this);
     return Result::Ok;
 }
 
 VulkanTexture::VulkanTexture(VulkanDevice * pDevice, const TextureDesc * pDesc)
-    : Super(pDevice)
+    : Super(pDevice, pDesc)
 {
     Info = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     Info.flags = 0;
@@ -2220,10 +2230,21 @@ VulkanSwapChain::VulkanSwapChain(VulkanFactory* pFactory, void* pHandle, const S
     if (pDesc->hasDepthStencilTarget)
     {
         Ptr<Texture> depthStecilTexture;
-        OwningDevice->CreateTexture(nullptr, depthStecilTexture.GetAddressOf());
+        TextureDesc texDesc;
+        texDesc.SetAllowedViewBits(TextureViewBit::DepthStencil).SetDepth(1)
+            .SetWidth(CreateInfo.imageExtent.width).SetHeight(CreateInfo.imageExtent.height)
+            .SetLayers(1).SetMipLevels(1)
+            .SetFormat(pDesc->depthStencilFormat)
+            .SetOption(StorageOption::Private);
+        OwningDevice->CreateTexture(&texDesc, depthStecilTexture.GetAddressOf());
 
         Ptr<TextureView> depthStencilView;
-        depthStecilTexture->CreateView(nullptr, depthStencilView.GetAddressOf());
+        TextureViewDesc dsvDesc;
+        dsvDesc.SetDimension(TextureDimension::Tex2D)
+            .SetMipLevel(0)
+            .SetView(ResourceViewType::SampledTexture)
+            .SetState(ResourceState::Common);
+        depthStecilTexture->CreateView(&dsvDesc, depthStencilView.GetAddressOf());
 
     }
 
@@ -2275,6 +2296,11 @@ Result VulkanFactory::EnumDevice(uint32_t * count, Device ** ppDevice)
 
 Result VulkanTexture::GetDesc(TextureDesc * pDesc)
 {
+    if (!pDesc)
+    {
+        return Result::ParamError;
+    }
+    memcpy(pDesc, &ResDesc, sizeof(ResDesc));
     return Result::Ok;
 }
 
@@ -2287,8 +2313,18 @@ VulkanTextureView::VulkanTextureView(const TextureViewDesc * pDesc, VulkanTextur
     Info.image = pTexture->GetHandle();
     Info.format = pTexture->Info.format;
     Info.viewType = ConvertTextureDimensionToVulkanEnum(pDesc->dimension);
-    Info.components;
-    Info.subresourceRange;
+    Info.components = { VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
+    TextureDesc texDesc;
+    pTexture->GetDesc(&texDesc);
+    Info.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    if (texDesc.allowedViewBits & TextureViewBit::DepthStencil)
+    {
+        Info.subresourceRange.aspectMask |= (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    }
+    if (texDesc.allowedViewBits & TextureViewBit::RenderTarget)
+    {
+        Info.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_COLOR_BIT;
+    }
     CHECK(vkCreateImageView(OwningTexture->OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
 }
 
@@ -2371,6 +2407,8 @@ VulkanRenderPass::VulkanRenderPass(VulkanDevice * pDevice, const RenderPassDesc 
         attachments[i].storeOp = ConvertStoreActionToVulkanEnum(pDesc->pColorAttachments[i].storeAction);
         attachments[i].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         attachments[i].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[i].samples = ConvertMultiSampleFlagToVulkanEnum(texDesc.samples);
+        attachments[i].flags = 0;
         colorRefers.push_back({ colorId, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
         colorId++;
     }
@@ -2425,14 +2463,30 @@ VulkanRenderPass::~VulkanRenderPass()
     Device->ReleaseInternal();
 }
 
-Result VulkanDevice::CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass)
+Result VulkanRenderPass::MakeFrameBuffer(
+    const TextureView ** pRenderTargetViews, int32_t viewCount, 
+    int32_t width, int32_t height, int32_t layers, 
+    FrameBuffer ** ppFramebuffer)
 {
-    *ppRenderpass = new VulkanRenderPass(this, desc);
+    if (!pRenderTargetViews || viewCount < 1 || width <= 0 || height <= 0 || layers <= 0 || !ppFramebuffer)
+        return Result::ParamError;
+    *ppFramebuffer = new VulkanDrawable(Device, this, pRenderTargetViews, viewCount, width, height, layers);
     return Result::Ok;
 }
 
-Result VulkanDevice::CreateFrameBuffer(const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget)
+Result VulkanRenderPass::MakeRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, NotNull const PipelineLayout * pPipelineLayout, Pipeline ** ppPipeline)
 {
+    if (!pPipelineDesc || !pPipelineLayout || !ppPipeline)
+        return Result::ParamError;
+    *ppPipeline = new VulkanRenderPipeline(Device, pPipelineDesc, this, pPipelineLayout);
+    return Result::Ok;
+}
+
+Result VulkanDevice::CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass)
+{
+    if (!desc || !ppRenderpass)
+        return Result::ParamError;
+    *ppRenderpass = new VulkanRenderPass(this, desc);
     return Result::Ok;
 }
 
@@ -2444,18 +2498,24 @@ Result VulkanDevice::CreateSampler(const SamplerDesc * desc, Sampler ** pSampler
 
 Result VulkanDevice::CreateBuffer(const BufferDesc * desc, Buffer ** pBuffer)
 {
+    if (!desc || !pBuffer)
+        return Result::ParamError;
     *pBuffer = new VulkanBuffer(this, desc);
     return Result::Ok;
 }
 
 Result VulkanDevice::CreateTexture(const TextureDesc * desc, Texture ** pTexture)
 {
+    if (!desc || !pTexture)
+        return Result::ParamError;
     *pTexture = new VulkanTexture(this, desc);
     return Result::Ok;
 }
 
 Result VulkanDevice::CreateFence(Fence ** ppFence)
 {
+    if (!ppFence)
+        return Result::ParamError;
     *ppFence = new VulkanFence(this);
     return Result::Ok;
 }
@@ -2535,7 +2595,7 @@ VulkanComputePipeline::~VulkanComputePipeline()
 {
 }
 
-VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderPipelineDesc * pDesc, RenderPass * pRenderPass, PipelineLayout * pLayout)
+VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderPipelineDesc * pDesc, RenderPass * pRenderPass, const PipelineLayout * pLayout)
     : VulkanRenderPipeline::Super(pDevice)
 {
     Info = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
@@ -2568,6 +2628,17 @@ VulkanRenderPipeline::VulkanRenderPipeline(VulkanDevice * pDevice, const RenderP
 
     TessellationState = { VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO };
     Info.pTessellationState = &TessellationState;
+
+    VulkanRenderPass* renderPass = static_cast<VulkanRenderPass*>(pRenderPass);
+    const VulkanPipelineLayout* pipelineLayout = static_cast<const VulkanPipelineLayout*>(pLayout);
+    assert(renderPass && pipelineLayout);
+
+    Info.renderPass = renderPass->Handle;
+    Info.layout = pipelineLayout->Handle;
+
+    Info.subpass = 0;
+    Info.basePipelineHandle = VK_NULL_HANDLE;
+    Info.basePipelineIndex = 0;
 
     CHECK(CreatePipelineCache(nullptr, 0));
     CHECK(CreatePipeline());
@@ -2816,7 +2887,7 @@ VulkanBindTableEncoder::VulkanBindTableEncoder(VulkanDevice * pDevice, const Arg
     }
     Info.pBindings = DescriptorBindings.data();
     Info.bindingCount = DescriptorBindings.size();
-    vkCreateDescriptorSetLayout(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle);
+    CHECK(vkCreateDescriptorSetLayout(OwningDevice->Handle, &Info, VULKAN_ALLOCATOR, &Handle));
 }
 
 VulkanBindTableEncoder::~VulkanBindTableEncoder()
@@ -3042,15 +3113,43 @@ VulkanDrawable::VulkanDrawable(VulkanDevice* pDevice, const FrameBufferDesc* pDe
     CHECK(vkCreateFramebuffer(Device->Handle, nullptr, VULKAN_ALLOCATOR, &Handle));
 }
 
-VulkanDrawable::~VulkanDrawable()
+VulkanDrawable::VulkanDrawable(VulkanDevice * pDevice, const VulkanRenderPass * pRenderPass, const TextureView ** pRenderTargetViews, int32_t viewCount, int32_t width, int32_t height, int32_t layers)
+    : Device(pDevice)
 {
-    vkDestroyFramebuffer(Device->Handle, Handle, VULKAN_ALLOCATOR);
-    Device->ReleaseInternal();
+    Device->AddInternalRef();
+    VkFramebufferCreateInfo CreateInfo = {
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO
+    };
+    CreateInfo.renderPass = pRenderPass->Handle;
+    CreateInfo.attachmentCount = viewCount;
+    CreateInfo.width = width;
+    CreateInfo.height = height;
+    CreateInfo.layers = layers;
+
+    std::vector<VkImageView> rawViews;
+    rawViews.resize(viewCount);
+    for (int i =0; i<viewCount; i++)
+    {
+        const TextureView* view = pRenderTargetViews[i];
+        const VulkanTextureView* rawView = static_cast<const VulkanTextureView*>(view);
+        assert(rawView);
+        //Attachments.push_back(rawView);
+        /*rawView->AddInternalRef();*/
+        rawViews[i] = rawView->Handle;
+    }
+    CreateInfo.pAttachments = rawViews.data();
+    CHECK(vkCreateFramebuffer(Device->Handle, &CreateInfo, VULKAN_ALLOCATOR, &Handle));
 }
 
-Texture * VulkanDrawable::Texture()
+VulkanDrawable::~VulkanDrawable()
 {
-    return nullptr;
+   /* for (auto* ptr : Attachments)
+    {
+        assert(ptr);
+        ptr->ReleaseInternal();
+    }*/
+    vkDestroyFramebuffer(Device->Handle, Handle, VULKAN_ALLOCATOR);
+    Device->ReleaseInternal();
 }
 
 void VulkanCommandBuffer::Commit(Fence * pFence)

@@ -4,7 +4,8 @@
 
 namespace k3d
 {
-	class K3D_API Timer {
+	class K3D_API Timer
+  {
 	public:
 
 		enum Precision
@@ -20,7 +21,7 @@ namespace k3d
 		int64     MicrosecElapsed();
 
 		void      BeginTimer();
-		int64      EndTimer();
+		int64     EndTimer();
 		float     GetFrameRate() { return m_FrameRate; }
 
 		void      Update();
@@ -34,7 +35,7 @@ namespace k3d
 
 		Precision m_Precision;
 		int       m_TimerId;
-		std::function<void()> TimerFunction;
+	//	std::function<void()> TimerFunction;
 
 		uint64    m_BaseTime;
 		uint64    m_LastTime;

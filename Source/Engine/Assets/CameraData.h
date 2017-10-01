@@ -4,6 +4,7 @@
 #include <Math/kMath.hpp>
 #include <Math/kGeometry.hpp>
 #include <KTL/Archive.hpp>
+#include <KTL/SharedPtr.hpp>
 
 namespace k3d
 {
@@ -54,5 +55,5 @@ namespace k3d
 		float			m_FarPlane;
 	};
 
-	typedef std::shared_ptr<CameraData> SpCameraData;
+	typedef SharedPtr<CameraData> SpCameraData;
 }

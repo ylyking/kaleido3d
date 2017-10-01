@@ -1,8 +1,10 @@
 #include "Common.h"
-#include <Engine/Assets/CameraData.h>
 #include <Core/App.h>
 #include <KTL/String.hpp>
+#include <Core/Runtime/Field.h>
 #include <iostream>
+#include <map>
+#define OFFSET(structure, member) ((int)&((structure*)0)->member); 
 
 #if K3DPLATFORM_OS_WIN
 #pragma comment(linker,"/subsystem:console")
@@ -81,14 +83,33 @@ public:
 	}
 };
 
+struct TestObj
+{
+    int X;
+    int Y;
+};
+
+std::map<std::string, void*> memberOffsets;
+
 void TestSharedPtr()
 {
+    int TestObj::*P = &TestObj::Y;
+
+    memberOffsets["Y"] = (*(void**)(&P));
+
+    //cout << (int)(P) << endl;
+    cout << &TestObj::Y << endl;
+
+    TestObj* Obj = new TestObj;
+    Obj->X = 20;
+    Obj->Y = 60;
+
+    Field field("Y", 4);
+
+    cout << *field.GetValuePtr<int>(Obj) << endl;
+
 	SharedPtr<Os::File> spFile(new Os::File);
 	cout << "file:" << spFile.UseCount() << endl;
-
-	SharedPtr<CameraData> spCam(new CameraData);
-	spCam.UseCount();
-	spCam->SetName("TestSharedPtr");
 
 	SharedPtr<SharedTest> spTest(new SharedTest);
 	cout << "SharedTest:" << spTest.UseCount() << endl;

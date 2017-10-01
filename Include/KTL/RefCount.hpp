@@ -104,14 +104,6 @@ K3D_COMMON_NS
 		}
 	};
 
-	template<size_t N, size_t Align = alignof(double)>
-	struct AlignedStorage
-	{
-		typedef struct {
-			alignas(Align) unsigned char CharData[N];
-		} Type;
-	};
-
 
 	template<typename T>
 	class TRefCountInstance : public RefCountBase

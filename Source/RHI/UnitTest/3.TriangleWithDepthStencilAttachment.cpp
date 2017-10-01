@@ -6,10 +6,8 @@
 #include <Core/Message.h>
 #include <Interface/IRHI.h>
 #include <Math/kMath.hpp>
-#include <Renderer/Render.h>
 
 using namespace k3d;
-using namespace render;
 using namespace kMath;
 
 class TriangleMesh;

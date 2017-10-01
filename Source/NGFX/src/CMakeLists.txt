@@ -5,7 +5,7 @@ set_source_files_properties(${NGFX_HEADER}
 	PROPERTIES GENERATED TRUE)
 
 if (WIN32 OR ANDROID OR LINUX)
-    generate_win_res(ngfx_vulkan VER "1.0.0.1" DESC "Next Generation Graphics Module")
+    generate_win_res(ngfx_vulkan VER "1.0.0.1" DESC "Next Generation Graphics (Vulkan) Module")
     generate_win_res(ngfxu VER "1.0.0.1" DESC "Next Generation Graphics Utility Module")
     generate_win_res(ngfx_vulkan_glslang VER "1.0.0.1" DESC "Next Generation Graphics Shader Compiler")
 
@@ -31,6 +31,19 @@ if (WIN32 OR ANDROID OR LINUX)
 
 	target_link_libraries(ngfx_vulkan Kaleido3D.Core ${SPIRVCROSS_LIBRARIES} ngfx_vulkan_glslang ${VULKAN_LIBRARIES})
 	set_target_properties(ngfx_vulkan PROPERTIES FOLDER "ngfx/src")
+
+    if(WIN32)
+        generate_win_res(ngfx_d3d12 VER "1.0.0.1" DESC "Next Generation Graphics (Direct3D 12) Module")
+	    add_library(ngfx_d3d12 SHARED 
+            ${NGFX_HEADER} ${NGFX_YML} 
+            ${ngfx_d3d12_RC} d3d12.cpp 
+            ${Kaleido3D_SOURCE_DIR}/Tools/RHIGenerator/generator/gen.py
+        )
+        target_link_libraries(ngfx_d3d12 Kaleido3D.Core)
+	    target_compile_definitions(ngfx_d3d12 PRIVATE BUILD_SHARED_LIB=1)
+        set_target_properties(ngfx_d3d12 PROPERTIES FOLDER "ngfx/src")
+    endif()
+
 elseif(MACOS)
 	add_library(ngfx_metal SHARED metal.cpp)
 	add_library(ngfxu SHARED ngfx.h ngfxu.h ngfxu.cpp)

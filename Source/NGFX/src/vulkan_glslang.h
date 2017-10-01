@@ -19,6 +19,14 @@
 #endif
 #endif
 
+typedef struct function_data_t* function_data;
+extern V_API void release_function_data(function_data* data);
+extern V_API ngfxShaderType get_function_data_stage(const function_data* data);
+extern V_API void compile_from_source(const char* source, function_data* data);
+extern V_API void serialize_library(const function_data* data, const char* save_path);
+
+#if __cplusplus
+
 using ByteCode = std::vector<uint32_t>;
 
 struct FunctionData
@@ -43,3 +51,5 @@ ngfx::Result CompileFromSource(const ngfx::CompileOption& Opt, const char* pSour
 
 extern V_API
 ngfx::Result SerializeLibrary(const FunctionMap& Data, const char* Path);
+
+#endif

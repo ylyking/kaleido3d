@@ -53,5 +53,13 @@ K3D_COMMON_NS
 		void deallocate(void* p, size_t n) { __k3d_free__(p, n); }
 		const char* get_name() const { return "kAllocator"; }
 		void set_name(const char*) {}
-	};
+    };
+
+    template<size_t N, size_t Align = alignof(double)>
+    struct AlignedStorage
+    {
+        typedef struct {
+            alignas(Align) unsigned char CharData[N];
+        } Type;
+    };
 }

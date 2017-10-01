@@ -6,6 +6,18 @@
 
 K3D_COMMON_NS
 {
+template <typename T1, typename T2>
+struct Pair
+{
+    Pair() : First(), Second() {}
+    Pair(T1 const& _First, T2 const& _Second)
+        : First(_First), Second(_Second)
+    {}
+
+    T1 First;
+    T2 Second;
+};
+
 template<typename... TList> struct Tuple;
 template<> struct Tuple<> {};
 typedef Tuple<> NullTuple;
@@ -17,6 +29,7 @@ struct Tuple<T, TList...> : public Tuple<TList...>
   typedef Tuple<TList...> base_type;
   typedef Tuple<T,TList...> this_type;
 
+  Tuple() : base_type(), Value() {}
   Tuple(const T & V, const TList&... Tails) : base_type(Tails...), Value(V) {}
   Tuple(const this_type & Other) : base_type(static_cast<const base_type&>(Other)), Value(Other.Value) {}
 
@@ -29,7 +42,8 @@ template<typename T>
 struct Tuple<T> : public NullTuple
 {
   typedef Tuple<T> this_type;
-
+  
+  Tuple() : Value() {}
   Tuple(const T & V) : Value(V) {}
   Tuple(const this_type & Other) : Value(Other.Value) {}
 

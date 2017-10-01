@@ -6,11 +6,9 @@
 #include <Core/Message.h>
 #include <Kaleido3D.h>
 #include <Math/kMath.hpp>
-#include <Renderer/Render.h>
 //#include <steam/steam_api.h>
 
 using namespace k3d;
-using namespace render;
 using namespace kMath;
 
 class CubeMesh;

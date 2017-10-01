@@ -28,3 +28,7 @@ install(TARGETS ShaderCompiler
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin)
+    
+if(BUILD_WITH_UNIT_TEST)
+    add_subdirectory(UnitTest)
+endif()

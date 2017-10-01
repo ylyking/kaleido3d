@@ -9,8 +9,6 @@ endif()
 set(UTIL_SRCS
     LogUtil.h
     LogUtil.cpp
-    Utils/StringUtils.h
-    Utils/StringUtils.cpp
     Utils/MD5.h
     Utils/MD5.cpp
 #    Utils/Base64.h
@@ -59,8 +57,8 @@ set(COMMON_SRCS
     WebSocket.h
     WebSocket.cpp
     Window.h
-    Looper.h
-    Looper.cpp
+#    Looper.h
+#    Looper.cpp
     App.h
     App.cpp
     AllocatorImpl.cpp
@@ -78,8 +76,18 @@ set(MATH_SRCS
 
 source_group(Math FILES ${MATH_SRCS})
 
+set(RT_SRCS
+    Runtime/Enum.h
+    Runtime/Method.h
+    Runtime/Field.h
+    Runtime/Class.h
+    Runtime/Runtime.h
+    Runtime/Runtime.cpp
+)
+source_group(Runtime FILES ${RT_SRCS})
+
 source_group(XPlatform FILES ${COMMON_SRCS})
-set(CORE_SRCS ${CORE_SRCS} ${MSG_SRCS} ${COMMON_SRCS} ${MODULE_SRC})
+set(CORE_SRCS ${CORE_SRCS} ${MSG_SRCS} ${COMMON_SRCS} ${MODULE_SRC} ${RT_SRCS})
 
 ####################Platform Specified###################
 
@@ -122,12 +130,11 @@ k3d_add_lib(Core SRCS ${CORE_SRCS} LIBS ${CORE_DEP_LIBS} FOLDER "Runtime"
     PCH_INCLUDE "${Kaleido3D_ROOT_DIR}/Include"
 )
 
-if(MACOS)
-    if(BUILD_SHARED)
-        add_custom_command(TARGET Kaleido3D.Core POST_BUILD COMMAND
-            ${CMAKE_INSTALL_NAME_TOOL} -id "@loader_path/../Frameworks/libCore.dylib" $<TARGET_FILE:Kaleido3D.Core>)
-    endif()
-endif()
+#if(WIN32)
+#set_target_properties(Kaleido3D.Core PROPERTIES
+#LINK_FLAGS "/nodefaultlib:vcruntime.lib /nodefaultlib:msvcrt.lib"
+#)
+#endif()
 
 install(TARGETS Kaleido3D.Core 
     ARCHIVE DESTINATION lib

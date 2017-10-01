@@ -1,7 +1,6 @@
 #pragma once
 #ifndef __LogUtil_h__
 #define __LogUtil_h__
-#include "Utils/StringUtils.h"
 
 #include <KTL/Singleton.hpp>
 #include <Interface/ILog.h>
@@ -29,9 +28,5 @@ namespace k3d
 
 #define KLOG(Level, TAG, ...) \
 	::k3d::Log(::k3d::ELogLevel::Level, #TAG, __VA_ARGS__);
-
-
-#define DBG_LINE_WITH_LAST_ERROR(tag, message) \
-	::k3d::Log(::k3d::ELogLevel::Error, (tag), "%s in file(%s) line(%d) %s", (message), __FILE__, __LINE__, GetLastWin32Error().c_str());
 
 #endif

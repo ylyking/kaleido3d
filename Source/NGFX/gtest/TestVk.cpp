@@ -4,6 +4,9 @@
 #include <Core/Os.h>
 #include <Core/App.h>
 #include <KTL/DynArray.hpp>
+//#include <KTL/HashMap.hpp>
+#include <KTL/SharedPtr.hpp>
+#include <KTL/Tuple.hpp>
 #include "gtest/gtest.h"
 
 using namespace k3d;
@@ -20,13 +23,31 @@ Ptr<CommandQueue> gfxQueue;
 Ptr<RenderPass> GlobalTestRenderPass;
 Ptr<BindTableEncoder> GlobalTableEncoder;
 Ptr<PipelineLayout> GlobalPipelineLayout;
-Ptr<Function> ComputeFunction;
-Ptr<Pipeline> GolbalPipeline;
+Ptr<ngfx::Function> ComputeFunction;
+
+Ptr<ngfx::Function> VertexFunction;
+Ptr<ngfx::Function> PixelFunction;
+Ptr<Texture> DefaultRenderTexture2D;
+Ptr<Pipeline> GlobalPipeline;
 Ptr<Pipeline> GlobalComputePipeline; 
+
+using PtrLib = k3d::SharedPtr<Os::LibraryLoader>;
+
+PtrLib GlobalGfxLib;
+
+typedef Result(*PFNCreateFactory)(Factory ** ppFactory, bool debugEnabled);
+PFNCreateFactory fnCreateFactory;
+
+TEST(LibLoader, rhi)
+{
+    GlobalGfxLib = MakeShared<Os::LibraryLoader>("ngfx_vulkan.dll");
+    fnCreateFactory = reinterpret_cast<PFNCreateFactory>(GlobalGfxLib->ResolveSymbol("CreateFactory"));
+    ASSERT_TRUE(fnCreateFactory);
+}
 
 TEST(CreateFactory, ngfxFactory)
 {
-  CreateFactory(GlobalTestFactory.GetAddressOf(), true);
+  fnCreateFactory(GlobalTestFactory.GetAddressOf(), true);
   ASSERT_TRUE(GlobalTestFactory.Get());
 }
 
@@ -42,20 +63,25 @@ TEST(CreateDevice, ngfxDevice)
 TEST(CreateLibrary, ngfxLibrary)
 {
   Ptr<Library> library;
-  Ptr<Function> function;
+  Ptr<ngfx::Function> function;
   Os::MemMapFile blobFile;
   String path = Os::Path::Join(GetEnv()->GetDataDir(), "Test", String("Test.blob"));
   ASSERT_TRUE(blobFile.Open(path.CStr(), IORead));
   GlobalTestDevice->CreateLibrary(nullptr, blobFile.FileData(), blobFile.GetSize(), library.GetAddressOf());
   blobFile.Close();
   ASSERT_TRUE(library.Get());
-  library->MakeFunction("MainVS", function.GetAddressOf());
-  ASSERT_TRUE(function.Get());
-  ASSERT_STREQ("MainVS", function->Name());
-  ASSERT_EQ(ShaderType::Vertex, function->Type());
+  library->MakeFunction("MainVS", VertexFunction.GetAddressOf());
+  ASSERT_TRUE(VertexFunction.Get());
+  ASSERT_STREQ("MainVS", VertexFunction->Name());
+  ASSERT_EQ(ShaderType::Vertex, VertexFunction->Type());
   library->MakeFunction("MainCS", ComputeFunction.GetAddressOf());
   ASSERT_STREQ("MainCS", ComputeFunction->Name());
   ASSERT_EQ(ShaderType::Compute, ComputeFunction->Type());
+
+  library->MakeFunction("MainPS", PixelFunction.GetAddressOf());
+  ASSERT_TRUE(PixelFunction.Get());
+  ASSERT_STREQ("MainPS", PixelFunction->Name());
+  ASSERT_EQ(ShaderType::Fragment, PixelFunction->Type());
 }
 
 TEST(CreateQueue, ngfxQueue)
@@ -63,20 +89,11 @@ TEST(CreateQueue, ngfxQueue)
   Ptr<CommandQueue> compQueue, copyQueue;
   GlobalTestDevice->CreateCommandQueue(CommandQueueType::Graphics, gfxQueue.GetAddressOf());
   ASSERT_TRUE(gfxQueue.Get());
-  GlobalTestDevice->CreateCommandQueue(CommandQueueType::Graphics, compQueue.GetAddressOf());
+  GlobalTestDevice->CreateCommandQueue(CommandQueueType::Compute, compQueue.GetAddressOf());
   ASSERT_TRUE(compQueue.Get());
-  GlobalTestDevice->CreateCommandQueue(CommandQueueType::Graphics, copyQueue.GetAddressOf());
+  GlobalTestDevice->CreateCommandQueue(CommandQueueType::Copy, copyQueue.GetAddressOf());
   ASSERT_TRUE(copyQueue.Get());
-
   ASSERT_TRUE(__is_enum(BufferViewBit));
-}
-
-/* Render Pass Creation */
-TEST(CreateRenderPass, ngfxRenderPass)
-{
-  RenderPassDesc desc;
-  GlobalTestDevice->CreateRenderPass(&desc, GlobalTestRenderPass.GetAddressOf());
-  ASSERT_TRUE(GlobalTestRenderPass.Get());
 }
 
 TEST(CreateBindTableEncoder, ngfxBindTableEncoder)
@@ -149,9 +166,9 @@ TEST(CreateTexture, ngfxTexture)
     GlobalTestDevice, PixelFormat::D32Float, 1024, 1024);
   ASSERT_TRUE(DepthStencilTexture.Get());
 
-  Ptr<Texture> RenderTexture2D = ngfxu::CreateRenderTexture2D(
+  DefaultRenderTexture2D = ngfxu::CreateRenderTexture2D(
     GlobalTestDevice, PixelFormat::RGBA8UNorm, 1024, 1024);
-  ASSERT_TRUE(RenderTexture2D.Get());
+  ASSERT_TRUE(DefaultRenderTexture2D.Get());
 
   Ptr<Texture> SampledTexture2D = ngfxu::CreateSampledTexture2D(
     GlobalTestDevice, PixelFormat::RGBA8UNorm, 1024, 1024);
@@ -195,12 +212,37 @@ TEST(CreateBufferView, ngfxBufferView)
   ASSERT_TRUE(bufferView.Get() != nullptr);
 }
 
+/* Render Pass Creation */
+TEST(CreateRenderPass, ngfxRenderPass)
+{
+    RenderPassDesc desc;
+    GlobalTestDevice->CreateRenderPass(&desc, GlobalTestRenderPass.GetAddressOf());
+    ASSERT_TRUE(GlobalTestRenderPass.Get());
+    ColorAttachmentDesc colorDesc;
+    colorDesc.SetLoadAction(LoadAction::Load)
+        .SetStoreAction(StoreAction::Store)
+        .SetTexture(DefaultRenderTexture2D.Get());
+    desc.SetColorAttachmentsCount(1).SetPColorAttachments(&colorDesc);
+    desc.SetPDepthStencilAttachment(nullptr);
+    GlobalTestDevice->CreateRenderPass(&desc, GlobalTestRenderPass.GetAddressOf());
+    ASSERT_TRUE(GlobalTestRenderPass.Get());
+}
+
 TEST(CreateFrameBuffer, ngfxFrameBuffer)
 {
   Ptr<FrameBuffer> frameBuffer;
-  FrameBufferDesc fboDesc;
-  GlobalTestDevice->CreateFrameBuffer(&fboDesc, frameBuffer.GetAddressOf());
-  ASSERT_TRUE(frameBuffer.Get());
+  Ptr<TextureView> colorAttachView;
+  TextureViewDesc renderTextureDesc{};
+  renderTextureDesc.SetDimension(TextureDimension::Tex2D)
+      .SetView(ResourceViewType::SampledTexture)
+      .SetMipLevel(1)
+      .SetState(ResourceState::FrameBuffer);
+  auto Ret = DefaultRenderTexture2D->CreateView(&renderTextureDesc, colorAttachView.GetAddressOf());
+  ASSERT_TRUE(colorAttachView.Get() && Ret == Result::Ok);
+
+  const TextureView* attachments[] = { colorAttachView.Get() };
+  Ret = GlobalTestRenderPass->MakeFrameBuffer(attachments, 1, 1024, 1024, 1, frameBuffer.GetAddressOf());
+  ASSERT_TRUE(frameBuffer.Get() && Ret == Result::Ok);
 }
 
 TEST(CreateSampler, ngfxSampler)
@@ -225,11 +267,12 @@ TEST(CreateComputePipeline, ngfxComputePipeline)
 TEST(CreateRenderPipeline, ngfxRenderPipeline)
 {
   RenderPipelineDesc desc;
-  GlobalTestDevice->CreateRenderPipeline(&desc,
-    GlobalTestRenderPass.Get(),
-    GolbalPipeline.GetAddressOf(), 
-    nullptr);
-  ASSERT_TRUE(GolbalPipeline.Get() != nullptr);
+  desc.SetVertexFunction(VertexFunction.Get())
+      .SetPixelFunction(PixelFunction.Get());
+  GlobalTestRenderPass->MakeRenderPipeline(&desc,
+    GlobalPipelineLayout.Get(),
+    GlobalPipeline.GetAddressOf());
+  ASSERT_TRUE(GlobalPipeline.Get() != nullptr);
 }
 
 TEST(CreateCommandBuffer, ngfxCommandBuffer)

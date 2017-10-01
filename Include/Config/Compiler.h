@@ -3,9 +3,17 @@
 #include "PlatformTypes.h"
 
 #if defined(K3D_CPP_REFLECTOR)
-#define k3dAnnotate(...) __attribute__((annotate(#__VA_ARGS__)))
+#define KCLASS(...) __attribute__((annotate(#__VA_ARGS__)))
+#define KSTRUCT(...) __attribute__((annotate(#__VA_ARGS__)))
+#define KFUNCTION(...) __attribute__((annotate(#__VA_ARGS__)))
+#define KPROPERTY(...) __attribute__((annotate(#__VA_ARGS__)))
+#define KENUM(...) __attribute__((annotate(#__VA_ARGS__)))
 #else
-#define k3dAnnotate(...)  
+#define KCLASS(...)  
+#define KSTRUCT(...)  
+#define KFUNCTION(...)  
+#define KPROPERTY(...)  
+#define KENUM(...)  
 #endif
 
 #if K3DCOMPILER_MSVC
@@ -14,6 +22,9 @@
 #pragma warning(disable:4127)
 #pragma warning(disable:4251)
 #define STD_CALL __stdcall
+#define K3D_DEPRECATED(text)  __declspec(deprecated(text))
+#else
+#define K3D_DEPRECATED(text) __attribute__((__deprecated__(text)))
 #endif
 
 #if K3DCOMPILER_CLANG

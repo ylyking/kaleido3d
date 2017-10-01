@@ -1,6 +1,7 @@
 #include "Kaleido3D.h"
 #include "LogUtil.h"
 #include "Module.h"
+#include <KTL/String.hpp>
 #include <cstdarg>
 #include <mutex>
 #include <Config/OSHeaders.h>
@@ -14,11 +15,7 @@ namespace k3d
 		static /*thread_local*/ char dbgStr[2048] = { 0 };
 		va_list va;
 		va_start(va, fmt);
-#if K3DPLATFORM_OS_ANDROID
-		::vsprintf(dbgStr, fmt, va);
-#else
-		::vsprintf(dbgStr, fmt, va);
-#endif
+        Vsnprintf(dbgStr, 2048, fmt, va);
 		va_end(va);
 
 		auto logModule = StaticPointerCast<k3d::ILogModule>(GlobalModuleManager.FindModule("KawaLog"));

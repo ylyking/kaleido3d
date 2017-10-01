@@ -1,4 +1,4 @@
-#include "Common.h"
+#include <Renderer/FontRenderer.h>
 
 #if K3DPLATFORM_OS_WIN
 #pragma comment(linker,"/subsystem:console")

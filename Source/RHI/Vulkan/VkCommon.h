@@ -11,6 +11,7 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <unordered_map>
 #include <Core/LogUtil.h>
 
 #define K3D_VK_BEGIN K3D_COMMON_NS { namespace vk {

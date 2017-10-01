@@ -15,7 +15,6 @@ namespace k3d
 
 	ImageData::~ImageData()
 	{
-		if (!m_ImgData.empty()) m_ImgData.clear();
 	}
 
 	uint32 ImageData::GetImageSize(uint32 level) const
@@ -40,7 +39,7 @@ namespace k3d
 		//  assert( face >= GL_TEXTURE_CUBE_MAP_POSITIVE_X && face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z);
 		//  assert( face == GL_TEXTURE_CUBE_MAP_POSITIVE_X || _cubeMap);
 		//  face = face - GL_TEXTURE_CUBE_MAP_POSITIVE_X;
-		assert((face*m_MipLev + level) < (int32)m_ImgData.size());
+		assert((face*m_MipLev + level) < m_ImgData.Count());
 		if (level >= (uint32)m_MipLev || (int32)face >= m_ImgLayers)
 			return nullptr;
 

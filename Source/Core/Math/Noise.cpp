@@ -1,6 +1,7 @@
 // Copyright (c) 2008, Casey Duncan (casey dot duncan at gmail dot com)
 #include "Kaleido3D.h"
 #include "Noise.h"
+#include <math.h>
 
 #define lerp(t, a, b) ((a) + (t) * ((b) - (a)))
 #define fastfloor(n) (int)(n) - (((n) < 0.0f) & ((n) != (int)(n)))

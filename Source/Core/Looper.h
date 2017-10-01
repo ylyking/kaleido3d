@@ -32,8 +32,8 @@ namespace k3d {
     static void Loop();
 
 
-    typedef std::shared_ptr<Handler> spHandler;
-    typedef std::shared_ptr<Thread> spThread;
+    typedef SharedPtr<Handler> spHandler;
+    typedef SharedPtr<Thread> spThread;
   
   protected:
     static thread_local Looper sMyLooper;

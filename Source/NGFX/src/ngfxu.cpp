@@ -51,6 +51,7 @@ namespace ngfxu
       .SetLayers(1)
       .SetMipLevels(1)
       .SetWidth(width).SetHeight(height).SetDepth(1)
+      .SetSamples(MultiSampleFlag::MS1x)
       .SetOption(StorageOption::Private);
     device->CreateTexture(&desc, texture.GetAddressOf());
     return texture;

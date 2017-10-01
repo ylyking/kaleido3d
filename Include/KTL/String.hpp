@@ -110,7 +110,7 @@ public:
         MoveAssign(Move(rhs));
     }
 
-    ~StringBase()
+    ~StringBase() K3D_NOEXCEPT
     {
         if (m_pStringData)
         {

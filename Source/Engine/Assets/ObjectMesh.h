@@ -1,5 +1,6 @@
 #pragma once
-
+#include <KTL/SharedPtr.hpp>
+#include <KTL/DynArray.hpp>
 namespace k3d 
 {
 	struct ObjectLoadListener {
@@ -10,9 +11,9 @@ namespace k3d
 	public:
 		ObjectMesh();
 
-		typedef std::shared_ptr<class Mesh>			PtrMesh;
-		typedef std::vector<PtrMesh>                PtrMeshArray;
-		typedef std::shared_ptr<ObjectMesh>				PtrModel;
+		typedef SharedPtr<class Mesh>			PtrMesh;
+		typedef DynArray<PtrMesh>                PtrMeshArray;
+		typedef SharedPtr<ObjectMesh>				PtrModel;
 		
 		static PtrModel Load(const char * data, size_t len);
 		static PtrModel Load(const char * name);

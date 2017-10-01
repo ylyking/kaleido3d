@@ -12,7 +12,5 @@
 #include <KTL/DynArray.hpp>
 
 #include <ShaderCompiler/Public/ShaderCompiler.h>
-#include <Renderer/FontRenderer.h>
-
 #include <memory>
 #include <thread>

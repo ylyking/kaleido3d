@@ -104,13 +104,13 @@ UTComputeParticles::OnInit()
   // create buffers
   auto PositionBuffer = AllocateVertexBuffer<Vec4f>([](Vec4f* Pointer)
   {
-    std::vector<std::shared_ptr<std::thread>> threadPool;
+    std::vector<SharedPtr<std::thread>> threadPool;
     // divide
     int ThreadCount = 8;
     int PerGroup = PARTICLE_COUNT / 8;
     for (auto i = 0; i < ThreadCount; i++)
     {
-      auto t = std::make_shared<std::thread>([=]()
+      auto t = MakeShared<std::thread>([=]()
       {
         for (auto g = 0; g < PerGroup; g++)
         {
@@ -135,13 +135,13 @@ UTComputeParticles::OnInit()
 
   auto VelocityBuffer = AllocateVertexBuffer<Vec4f>([](Vec4f* Pointer)
   {
-    std::vector<std::shared_ptr<std::thread>> threadPool;
+    std::vector<SharedPtr<std::thread>> threadPool;
     // divide
     int ThreadCount = 8;
     int PerGroup = PARTICLE_COUNT / 8;
     for (auto i = 0; i < ThreadCount; i++)
     {
-      auto t = std::make_shared<std::thread>([=]()
+      auto t = MakeShared<std::thread>([=]()
       {
         for (auto g = 0; g < PerGroup; g++)
         {

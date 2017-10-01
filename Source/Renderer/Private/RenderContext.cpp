@@ -1,4 +1,4 @@
-#include "Kaleido3D.h"
+#include "Renderer.h"
 #include <Core/Module.h>
 #if K3DPLATFORM_OS_WIN
 #include <RHI/Vulkan/Public/IVkRHI.h>
@@ -11,7 +11,6 @@
 #include <RHI/Vulkan/VkCommon.h>
 #endif
 #include "Core/LogUtil.h"
-#include "Render.h"
 
 using namespace k3d;
 

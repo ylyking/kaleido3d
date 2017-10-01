@@ -1081,6 +1081,32 @@ protype:
     - render pass:
         type: interface
         inherit: named object<false>
+        functions:
+            - make frame buffer:
+                params:
+                    - name: pRenderTargetViews
+                      type: const texture view **
+                    - name: viewCount
+                      type: int32_t
+                    - name: width
+                      type: int32_t
+                    - name: height
+                      type: int32_t
+                    - name: layers
+                      type: int32_t
+                    - name: ppFramebuffer
+                      type: frame buffer **
+                return: result
+
+            - make render pipeline:
+                params:
+                    - name: pPipelineDesc
+                      type: NotNull const render pipeline desc *
+                    - name: pPipelineLayout
+                      type: NotNull const pipeline layout *
+                    - name: ppPipeline
+                      type: pipeline **
+                return: result
 
     - pipeline:
         type: interface
@@ -1336,13 +1362,6 @@ protype:
                   - name: ppRenderpass
                     type: render pass **
                 return: result
-            - create frame buffer:
-                params:
-                  - name: desc
-                    type: NotNull const frame buffer desc *
-                  - name: ppRenderTarget
-                    type: frame buffer **
-                return: result
             - create sampler:
                 params:
                     - name: desc
@@ -1570,6 +1589,7 @@ protype:
         type: function
         comment: Create NGFX API factory
         exported: true
+        c_api: true
         params:
             - name: ppFactory
               type: factory **

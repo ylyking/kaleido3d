@@ -9,8 +9,8 @@
 #include <Interface/IIODevice.h>
 #include <KTL/String.hpp>
 #include <KTL/Functional.hpp>
-#include <functional>
-#include <map>
+//#include <functional>
+//#include <map>
 
 
 /**
@@ -115,6 +115,18 @@ private:
   size_t m_szFile;
   kByte* m_pData;
   kByte* m_pCur;
+};
+
+class K3D_API LibraryLoader
+{
+public:
+    LibraryLoader(const char* libPath);
+    virtual ~LibraryLoader();
+
+    void* ResolveSymbol(const char* entryName);
+
+private:
+    struct LibraryPrivate* d;
 };
 
 namespace Path
@@ -303,7 +315,6 @@ public:
 
   void SetPriority(ThreadPriority prio);
 
-  k3dAnnotate([[Deprecated]])
   void Start();
   
   void Join();
@@ -314,20 +325,21 @@ public:
 
 public:
   static k3d::String GetCurrentThreadName();
-  static void SetCurrentThreadName(std::string const& name);
+  static void SetCurrentThreadName(k3d::String const& name);
 
 private:
   typedef __INTERNAL_THREAD_ROUTINE_RETURN (*ThrRoutine)(void*);
   void InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closure);
 
-  k3d::String m_ThreadName;
-  ThreadPriority m_ThreadPriority;
-  uint32_t m_StackSize;
-  ThreadStatus m_ThreadStatus;
-  Handle m_ThreadHandle;
-
-private:
-  static std::map<uint32, Thread*> s_ThreadMap;
+  static __INTERNAL_THREAD_ROUTINE_RETURN RunOnThread(void*);
+  
+  k3d::String                 m_ThreadName;
+  ThreadPriority              m_ThreadPriority;
+  uint32_t                    m_StackSize;
+  ThreadStatus                m_ThreadStatus;
+  Handle                      m_ThreadHandle;
+  ThrRoutine                  m_ThreadFunc;
+  __internal::ThreadClosure*  m_ThreadClosure;
 };
 
 class SockImpl;

@@ -1,4 +1,6 @@
 #include "Common.h"
+//#include <KTL/HashMap.hpp>
+#include <iostream>
 
 #if K3DPLATFORM_OS_WIN
 #pragma comment(linker,"/subsystem:console")
@@ -66,6 +68,7 @@ void TestDynArrray()
 			.Append(B("A4"))
 			.Append(B("A5"));
     }
+
 }
 
 int main(int argc, char**argv)

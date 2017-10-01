@@ -8,6 +8,7 @@ Apache License
 #include <Core/Os.h>
 #include <ngfx.h>
 #include <ngfxu.h>
+//#include "../MiniRenderer/MiniRenderer.h"
 
 #if _WIN32
 #pragma comment(linker,"/subsystem:console")
@@ -97,28 +98,15 @@ using namespace ngfx;
 class TestApp : public k3d::App
 {
 public:
-  TestApp() : k3d::App("test", 1920, 1080) 
-  {
-  }
+  TestApp() : k3d::App("test", 800, 600) {}
 
   bool OnInit() override
   {
     k3d::App::OnInit();
+    // Initialize MiniRenderer
+    //MiniRenderer::Init(800, 600, PixelFormat::RGBA8UNorm, HostWindow()->GetHandle());
 
-    CreateFactory(factory.GetAddressOf(), false);
-    factory->SetName("VulkanFactory");
-
-    uint32_t Count = 0;
-    factory->EnumDevice(&Count, nullptr);
-    factory->EnumDevice(&Count, device.GetAddressOf());
-
-    device->CreateCommandQueue(CommandQueueType::Graphics, queue.GetAddressOf());
-    queue->SetName("GraphicsQueue");
-
-    SwapChainDesc swapChainDesc = { PixelFormat::RGBA8UNorm, 800, 600, 2, true, PixelFormat::D32Float };
-    //factory->CreateSwapchain(&swapChainDesc, queue.Get(), HostWindow()->GetHandle(), swapChain.GetAddressOf());
-    //swapChain->SetName("DefaultSwapchain");
-
+    /*
     BufferDesc bufferDesc{ BufferViewBit::VertexBuffer, StorageOption::Managed, 10 };
     device->CreateBuffer(&bufferDesc, buffer.GetAddressOf());
     buffer->SetName("Buffer0");
@@ -168,12 +156,13 @@ public:
     device->CreatePipelineLibrary(nullptr, 0, pipelineLibrary.GetAddressOf());
     pipelineLibrary->StorePipeline("Render", renderPipeline.Get());
     pipelineLibrary->StorePipeline("Compute", computePipeline.Get());
-
+    */
     return true;
   }
 
   void OnProcess(k3d::Message &)override
   {
+      /*
     auto drawable = swapChain->NextDrawable();
     Ptr<CommandBuffer> command;
     queue->CreateCommandBuffer(command.GetAddressOf());
@@ -185,7 +174,7 @@ public:
     renderEncoder->SetVertexBuffer(0, 0, nullptr);
     renderEncoder->DrawIndexedInstanced(nullptr);
     renderEncoder->EndEncode();
-
+    */
     /*
     Ptr<Framebuffer> fbo;
     FramebufferDesc fbD;
@@ -197,7 +186,7 @@ public:
     device->CreateFramebuffer(&fbD, fbo.GetAddressOf());
     command->CreateRenderCommandEncoder(fbo.Get(), renderPass.Get(), renderEncoder.GetAddressOf());
     */
-    command->Commit(fence.Get());
+    //command->Commit(fence.Get());
     //swapChain->Present()
   }
 

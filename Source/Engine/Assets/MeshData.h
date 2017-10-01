@@ -208,7 +208,7 @@ namespace k3d
 		kMath::Vec3f	        m_MinCorner;
 	};
 
-	typedef std::shared_ptr<MeshData> SpMesh;
+	typedef SharedPtr<MeshData> SpMesh;
 }
 
 #endif

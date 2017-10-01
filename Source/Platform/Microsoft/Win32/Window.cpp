@@ -299,7 +299,7 @@ namespace k3d
 				GetModuleHandle(NULL), this);
 
 			if (!handle) {
-				DBG_LINE_WITH_LAST_ERROR("WindowsWindow", "InitWindow failed!");
+				//DBG_LINE_WITH_LAST_ERROR("WindowsWindow", "InitWindow failed!");
 				return E_FAIL;
 			}
 

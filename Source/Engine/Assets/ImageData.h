@@ -3,6 +3,8 @@
 #pragma once
 
 #include "Bundle.h"
+#include <KTL/String.hpp>
+#include <KTL/DynArray.hpp>
 
 namespace k3d 
 {
@@ -22,7 +24,7 @@ namespace k3d
 		ImageData();
 		virtual ~ImageData();
 
-		using string = std::string;
+		using string = String;
 
 		KOBJECT_PROPERTY(Name, string);
 		KOBJECT_PROPERTY_GET(Width, uint32);
@@ -47,7 +49,7 @@ namespace k3d
 		virtual bool IsCubeMap() const;
 
 		friend class k3dAssetManager;
-		typedef std::vector<kByte*> ByteVec;
+		typedef DynArray<kByte*> ByteVec;
 
 	protected:
 

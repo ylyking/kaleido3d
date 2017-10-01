@@ -6,6 +6,7 @@
 #include <KTL/String.hpp>
 #include <list>
 #include <algorithm>
+#include <unordered_map>
 #include <utility>
 #include <Config/OSHeaders.h>
 

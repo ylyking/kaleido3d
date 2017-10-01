@@ -457,6 +457,7 @@ KFORCE_INLINE tVectorN<T, N> operator * (const tMatrixNxN<T, N> &a, const tVecto
   return result;
 }
 
+#ifdef _IOSFWD_
 //! \fn	template <typename T, int N> KFORCE_INLINE std::ostream & operator<< (std::ostream & os, const tVectorN<T, N> &vec)
 //! \brief	&lt;&lt;&lt;typename T,int N&gt; casting operator.
 //! \param [in,out]	os	The operating system.
@@ -517,7 +518,7 @@ KFORCE_INLINE std::ostream & operator << (std::ostream & os, const tMatrixNxN<T,
   os << std::endl;
   return os;
 }
-
+#endif
 //--------------------------------------------------------------------
 template <typename T>
 class tMatrixNxN<T, 4>
@@ -528,7 +529,7 @@ public:
   typedef tVectorN<T, 4> RowType;
 
   tMatrixNxN<T, 4>() {}
-
+#ifdef _INITIALIZER_LIST_
   tMatrixNxN<T,4>( std::initializer_list<T>& list)
   {
     int count = 0;
@@ -540,6 +541,7 @@ public:
         break;
     }
   }
+#endif
 
   tMatrixNxN<T, 4>( RowType &row0, RowType &row1, RowType &row2, RowType &row3 )
   {

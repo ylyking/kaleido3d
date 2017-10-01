@@ -13,15 +13,25 @@ K3D_API void __k3d_free__(void *p, size_t sizeOfObj)
 
 K3D_API void* operator new[](size_t size, const char* pName)
 {
-	return malloc(size);
+	return __k3d_malloc__(size);
 }
 
 K3D_API void* operator new(size_t Size, const char* _ClassName, const char* _SourceFile, int _SourceLine)
 {
-  return malloc(Size);
+  return __k3d_malloc__(Size);
 }
 
 K3D_API void operator delete(void* _Ptr, const char* _SourceFile, int _SourceLine)
 {
-  free(_Ptr);
+    __k3d_free__(_Ptr, -1);
 }
+
+//K3D_API void* operator new[](size_t size)
+//{
+//    return __k3d_malloc__(size);
+//}
+
+//K3D_API void operator delete(void* _Ptr)
+//{
+//    __k3d_free__(_Ptr, -1);
+//}

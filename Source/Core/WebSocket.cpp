@@ -1,5 +1,6 @@
 #include "Kaleido3D.h"
 #include <KTL/String.hpp>
+#include <KTL/DynArray.hpp>
 #include "WebSocket.h"
 #include "Utils/SHA1.h"
 
@@ -24,7 +25,7 @@ namespace net
         WebSocketFrameType	GetFrame(unsigned char* in_buffer, size_t in_length, unsigned char* out_buffer, int out_size, int* out_length);
         int					MakeFrame(WebSocketFrameType frame_type, const char* msg, int msg_len, unsigned char* buffer, int buffer_len);
         k3d::String			Trim(k3d::String str);
-        std::vector<k3d::String> Explode(
+        k3d::DynArray<k3d::String> Explode(
             k3d::String theString, k3d::String theDelimiter,
             bool theIncludeEmptyStrings = false);
 
@@ -119,12 +120,12 @@ namespace net
         }
 
         headers.Resize(header_end); // trim off any data we don't need after the headers
-        vector<String> headers_rows = Explode(headers, String("\r\n"));
-        for(int i=0; i<headers_rows.size(); i++) {
+        k3d::DynArray<String> headers_rows = Explode(headers, String("\r\n"));
+        for(int i=0; i<headers_rows.Count(); i++) {
             String& header = headers_rows[i];
             if(header.Find("GET") == 0) {
-                vector<String> get_tokens = Explode(header, String(" "));
-                if(get_tokens.size() >= 2) {
+                k3d::DynArray<String> get_tokens = Explode(header, String(" "));
+                if(get_tokens.Count() >= 2) {
                     this->resource = get_tokens[1];
                 }
             }
@@ -162,12 +163,12 @@ namespace net
         return String();
     }
 
-    vector<String> WebSocketImpl::Explode(
+    k3d::DynArray<String> WebSocketImpl::Explode(
         String  theString,
         String  theDelimiter,
         bool    theIncludeEmptyStrings)
     {
-        vector<String> theStringVector;
+        k3d::DynArray<String> theStringVector;
 		size_t  start = 0, end = 0, length = 0;
 
         while ( end != String::npos )
@@ -180,7 +181,7 @@ namespace net
             if (theIncludeEmptyStrings
                 || (   ( length > 0 ) /* At end, end == length == string::npos */
                        && ( start  < theString.Length() ) ) )
-                theStringVector.push_back( theString.SubStr( start, length ) );
+                theStringVector.Append( theString.SubStr( start, length ) );
 
             // If at end, use start=maxSize.  Else use start=end+delimiter.
             start = (   ( end > (String::npos - theDelimiter.Length()) )

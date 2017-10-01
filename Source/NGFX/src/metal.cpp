@@ -57,11 +57,7 @@ public:
   ~MtlDevice() override;
   void GetDesc(DeviceDesc * pDesc) override;
   Result CreateCommandQueue(CommandQueueType queueType, CommandQueue ** pQueue) override;
-  //Result CreateShaderLayout(const ShaderLayoutDesc * pShaderLayoutDesc, ShaderLayout ** ppShaderLayout) override;
   Result CreatePipelineLayout(const PipelineLayoutDesc * pPipelineLayoutDesc, PipelineLayout ** ppPipelineLayout) override;
-  //Result CreateBindingTable(PipelineLayout * pPipelineLayout, BindingTable ** ppBindingTable) override;
-  Result CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc, PipelineLayout * pPipelineLayout, RenderPass * pRenderPass, Pipeline ** pPipelineState) override;
-  Result CreateComputePipeline(Function * pComputeFunction, PipelineLayout * pPipelineLayout, Pipeline ** pPipeline) override;
   Result CreateRenderPass(const RenderPassDesc * desc, RenderPass ** ppRenderpass) override;
   //Result CreateRenderTarget(const RenderTargetDesc * desc, RenderTarget ** ppRenderTarget) override;
   Result CreateSampler(const SamplerDesc* desc, Sampler ** pSampler) override;
@@ -206,7 +202,7 @@ class MtlRenderPipeline : public DeviceObject<RenderPipeline>
 public:
   MtlRenderPipeline(MtlDevice*);
   ~MtlRenderPipeline() override;
-  PipelineType Type() override { return PipelineType::Graphics; }
+  PipelineType Type() const override { return PipelineType::Graphics; }
   Result GetDesc(RenderPipelineDesc * pDesc) override;
   MTLRenderPipelineDescriptor* Desc = nil;
 };
@@ -217,7 +213,7 @@ class MtlComputePipeline : public DeviceObject<ComputePipeline>
 public:
   MtlComputePipeline(MtlDevice*);
   ~MtlComputePipeline() override;
-  PipelineType Type() override { return PipelineType::Compute; }
+  PipelineType Type() const override { return PipelineType::Compute; }
   MTLComputePipelineDescriptor* Desc = nil;
 };
 
@@ -264,7 +260,7 @@ class MtlQueue : public DeviceObject<CommandQueue>
 public:
   MtlQueue(MtlDevice* pDevice);
   ~MtlQueue() override;
-  struct CommandBuffer * CommandBuffer() override;
+  Result CreateCommandBuffer(CommandBuffer ** ppComandBuffer) override;
 };
 
 class MtlCommandBuffer : public CommandBuffer
@@ -273,15 +269,14 @@ public:
   MtlCommandBuffer(MtlQueue* pQueue);
   ~MtlCommandBuffer() override;
   
-  MtlTraits<CommandBuffer>::Obj Id;
-  MtlQueue* OwningQueue;
+    MtlTraits<CommandBuffer>::Obj Id;
+    MtlQueue* OwningQueue;
   
-  void Commit(Fence * pFence) override;
-  
-  struct RenderCommandEncoder* RenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass) override;
-  struct ComputeCommandEncoder * ComputeCommandEncoder() override;
-  struct CopyCommandEncoder * CopyCommandEncoder() override;
-  struct ParallelRenderCommandEncoder * ParallelCommandEncoder() override;
+    void Commit(Fence * pFence) override;
+    Result CreateRenderCommandEncoder(Drawable * pDrawable, RenderPass * pRenderPass, RenderCommandEncoder ** ppRenderCommandEncoder) override;
+    Result CreateComputeCommandEncoder(ComputeCommandEncoder ** ppComputeCommandEncoder) override;
+    Result CreateCopyCommandEncoder(CopyCommandEncoder ** ppCopyCommandEncoder) override;
+    Result CreateParallelCommandEncoder(ParallelRenderCommandEncoder ** ppCopyCommandEncoder) override;
 };
 
 template <class T>
@@ -363,12 +358,6 @@ MtlRenderEncoder::~MtlRenderEncoder()
   
 }
 
-RenderCommandEncoder*
-MtlCommandBuffer::RenderCommandEncoder(ngfx::Drawable *pDrawable, ngfx::RenderPass *pRenderPass)
-{
-  return nullptr;
-}
-
 MtlComputeEncoder::MtlComputeEncoder(MtlCommandBuffer* CmdBuffer)
 : Super(CmdBuffer)
 {
@@ -380,24 +369,6 @@ MtlComputeEncoder::~MtlComputeEncoder()
   
 }
 
-ComputeCommandEncoder*
-MtlCommandBuffer::ComputeCommandEncoder()
-{
-  return nullptr;
-}
-
-CopyCommandEncoder*
-MtlCommandBuffer::CopyCommandEncoder()
-{
-  return nullptr;
-}
-
-ParallelRenderCommandEncoder*
-MtlCommandBuffer::ParallelCommandEncoder()
-{
-  return nullptr;
-}
-
 MtlQueue::MtlQueue(MtlDevice* pDevice)
 : Super(pDevice)
 {
@@ -407,12 +378,6 @@ MtlQueue::MtlQueue(MtlDevice* pDevice)
 MtlQueue::~MtlQueue()
 {
   
-}
-
-CommandBuffer*
-MtlQueue::CommandBuffer()
-{
-  return new MtlCommandBuffer(this);
 }
 
 Result
@@ -439,16 +404,6 @@ MtlRenderPipeline::GetDesc(ngfx::RenderPipelineDesc *pDesc)
   return Result::Ok;
 }
 
-Result
-MtlDevice::CreateRenderPipeline(const RenderPipelineDesc * pPipelineDesc,
-                                PipelineLayout * pPipelineLayout,
-                                RenderPass * pRenderPass,
-                                Pipeline ** pPipelineState)
-{
-  *pPipelineState = new MtlRenderPipeline(this);
-  return Result::Ok;
-}
-
 MtlComputePipeline::MtlComputePipeline(MtlDevice* pDevice)
 : Super(pDevice)
 {
@@ -458,15 +413,6 @@ MtlComputePipeline::MtlComputePipeline(MtlDevice* pDevice)
 MtlComputePipeline::~MtlComputePipeline()
 {
   
-}
-
-Result
-MtlDevice::CreateComputePipeline(Function * pComputeFunction,
-                                 PipelineLayout * pPipelineLayout,
-                                 Pipeline ** pPipeline)
-{
-  * pPipeline = new MtlComputePipeline(this);
-  return Result::Ok;
 }
 
 Result
@@ -558,25 +504,7 @@ MtlDevice::CreateRenderPass(const RenderPassDesc *desc, RenderPass **ppRenderpas
 }
 
 Result
-MtlDevice::CreateBindingTable(PipelineLayout *pPipelineLayout, BindingTable **ppBindingTable)
-{
-  return Result::Ok;
-}
-
-Result
-MtlDevice::CreateShaderLayout(const ShaderLayoutDesc *pShaderLayoutDesc, ShaderLayout **ppShaderLayout)
-{
-  return Result::Ok;
-}
-
-Result
 MtlDevice::CreatePipelineLayout(const PipelineLayoutDesc *pPipelineLayoutDesc, PipelineLayout **ppPipelineLayout)
-{
-  return Result::Ok;
-}
-
-Result
-MtlDevice::CreateRenderTarget(const RenderTargetDesc *desc, RenderTarget **ppRenderTarget)
 {
   return Result::Ok;
 }

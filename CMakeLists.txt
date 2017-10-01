@@ -154,7 +154,7 @@ Project/Platform.cmake
 add_subdirectory(Source/Core)
 add_subdirectory(Source/Log)
 add_subdirectory(Source/Renderer)
-add_subdirectory(Source/Engine)
+#add_subdirectory(Source/Engine)
 add_subdirectory(Source/RHI)
 add_subdirectory(Source/ShaderCompiler)
 

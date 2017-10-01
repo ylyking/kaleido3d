@@ -2837,6 +2837,8 @@ struct FrameBuffer : public NamedObject<false>
 
 struct RenderPass : public NamedObject<false>
 {
+  virtual Result MakeFrameBuffer(const TextureView ** pRenderTargetViews, int32_t viewCount, int32_t width, int32_t height, int32_t layers, FrameBuffer ** ppFramebuffer) = 0;
+  virtual Result MakeRenderPipeline(NotNull const RenderPipelineDesc * pPipelineDesc, NotNull const PipelineLayout * pPipelineLayout, Pipeline ** ppPipeline) = 0;
 };
 
 struct Pipeline : public NamedObject<false>
@@ -2922,7 +2924,6 @@ struct Device : public NamedObject<true>
   virtual Result CreatePipelineLibrary(const void * pData, uint64_t Size, PipelineLibrary ** ppPipelineLibrary) = 0;
   virtual Result CreateLibrary(const CompileOption * compileOption, const void * pData, uint64_t Size, Library ** ppLibrary) = 0;
   virtual Result CreateRenderPass(NotNull const RenderPassDesc * desc, RenderPass ** ppRenderpass) = 0;
-  virtual Result CreateFrameBuffer(NotNull const FrameBufferDesc * desc, FrameBuffer ** ppRenderTarget) = 0;
   virtual Result CreateSampler(NotNull const SamplerDesc* desc, Sampler ** pSampler) = 0;
   virtual Result CreateBuffer(NotNull const BufferDesc* desc, Buffer ** pBuffer) = 0;
   virtual Result CreateTexture(NotNull const TextureDesc * desc, Texture ** pTexture) = 0;
@@ -2994,7 +2995,7 @@ struct ParallelRenderCommandEncoder : public CommandEncoder
   virtual RenderCommandEncoder * Encoder() = 0;
 };
 
-Result NGFX_API CreateFactory(Factory ** ppFactory, bool debugEnabled);
+extern "C" Result NGFX_API CreateFactory(Factory ** ppFactory, bool debugEnabled);
 
 } // namespace ngfx
 #endif // __cplusplus

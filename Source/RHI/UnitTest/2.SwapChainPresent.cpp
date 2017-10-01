@@ -2,7 +2,6 @@
 #include <Core/Message.h>
 #include <Interface/IRHI.h>
 #include <Kaleido3D.h>
-#include <Renderer/Render.h>
 #if K3DPLATFORM_OS_WIN
 #include <RHI/Vulkan/Public/IVkRHI.h>
 #include <RHI/Vulkan/VkCommon.h>
@@ -15,7 +14,6 @@
 #endif
 
 using namespace k3d;
-using namespace render;
 
 class SwapchainPresent : public App {
 public:

@@ -40,7 +40,7 @@ namespace k3d
 	public:
 		MemmapedAsset(const char * path)
 		{
-			m_File = std::make_shared<Os::MemMapFile>();
+			m_File = MakeShared<Os::MemMapFile>();
 			m_File->Open(path, IORead);
 		}
 
@@ -56,7 +56,7 @@ namespace k3d
 		bool Seek(uint64 offset) override { return m_File->Seek((size_t)offset); }
 
 	private:
-		std::shared_ptr<Os::MemMapFile> m_File;
+		SharedPtr<Os::MemMapFile> m_File;
 	};
 
 #if K3DPLATFORM_OS_ANDROID

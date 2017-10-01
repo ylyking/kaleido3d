@@ -1,5 +1,6 @@
 #include "Common.h"
-#include <Core/Utils/MD5.h>
+#include <KTL/Functional.hpp>
+#include <iostream>
 
 #if K3DPLATFORM_OS_WIN
 #pragma comment(linker,"/subsystem:console")
@@ -29,9 +30,7 @@ void TestString()
 
     cout << testString.Find("yo") << endl;
 
-	MD5 md5;
-	md5.Update(testString);
-	auto testMd5 = md5.Str();
+	auto testMd5 = MD5Encode(testString);
 	cout << "md5:" << testMd5.CStr() << endl;
 
 	cout << "md5:" << MD5Encode(testString).CStr() << endl;
@@ -52,6 +51,12 @@ void TestString()
     cout << "Sub(3,4):" << d64.SubStr(3, 4).CStr() << endl;
     cout << d64.FindLastOf('r') << endl;
     cout << d64.FindLastOf('x') << endl;
+
+    cout << "Test Invoke: " << Invoke([](int a, int b) -> int
+    {
+        return a + b;
+    }, 1, 2) << endl;
+
 }
 
 int main(int argc, char**argv)

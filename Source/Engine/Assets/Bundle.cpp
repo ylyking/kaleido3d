@@ -2,7 +2,6 @@
 #include <Core/Os.h>
 #include <Core/LogUtil.h>
 #include <KTL/String.hpp>
-#include <Core/Utils/StringUtils.h>
 #include "Bundle.h"
 #include "MeshData.h"
 #include "CameraData.h"

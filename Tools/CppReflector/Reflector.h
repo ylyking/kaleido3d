@@ -14,11 +14,12 @@ public:
 
   using List = DynArray<Cursor>;
 
-  List GetChildren();
+  K3D_DEPRECATED("dddd")
+  List GetChildren() KFUNCTION(Y);
 
 private:
   CXCursor m_Handle;
-};
+} KCLASS(X);
 
 
 }

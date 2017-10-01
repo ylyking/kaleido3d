@@ -9,4 +9,6 @@
 #include "Config/CppStl.h"
 #include "Config/ObjDefs.h"
 
+#include <assert.h>
+
 #endif

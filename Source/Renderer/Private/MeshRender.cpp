@@ -1,11 +1,11 @@
-#include "Render.h"
+#include "Renderer.h"
 
 using namespace k3d;
 
 namespace render
 {
 	RenderableMesh::RenderableMesh()
-		: MeshData(), Renderable()
+		: Renderable()
 	{
 	}
 

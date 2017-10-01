@@ -441,9 +441,13 @@ typedef struct   Float32x4 { Float32 x,y,z,w;
         func_decl = function['val']
         ret = 'void' if 'return' not in func_decl else func_decl['return']
         exported = 'exported' in func_decl
+        c_api = 'c_api' in func_decl
         ret_type = self.get_real_type_name(ret, None, is_cpp)
         if exported:
-          self.__header__.write('\n{0} NGFX_API {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
+            if c_api:
+                self.__header__.write('\nextern "C" {0} NGFX_API {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
+            else:
+                self.__header__.write('\n{0} NGFX_API {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
         else:
           self.__header__.write('\n{0} {1}'.format(ret_type, make_name_AxxBxx(function['function'])))
 

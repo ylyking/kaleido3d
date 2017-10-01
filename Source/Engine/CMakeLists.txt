@@ -1,5 +1,8 @@
 #include_directories(${RAPIDJSON_INCLUDE_DIR})
-
+include_directories(
+	.. 
+	../../Include
+)
 
 set(SRC_CAMERA			Assets/CameraData.h Assets/CameraData.cpp)
 set(SRC_MESH			Assets/MeshData.h Assets/MeshData.cpp Assets/ObjectMesh.h Assets/ObjectMesh.cpp Assets/RiggedMeshData.h Assets/RiggedMeshData.cpp)
@@ -67,11 +70,6 @@ source_group(
 	${SCENE_SRCS}
 )
 
-include_directories(
-	.. 
-	../../Include
-)
-
 set(RENDERER_SRCS
 	RendererFactory.h
 	RendererFactory.cpp
@@ -119,4 +117,8 @@ PCH_INCLUDE
 install(TARGETS Kaleido3D.Engine 
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin)
+	RUNTIME DESTINATION bin)
+	
+if(BUILD_WITH_UNIT_TEST)
+add_subdirectory(UnitTest)
+endif()

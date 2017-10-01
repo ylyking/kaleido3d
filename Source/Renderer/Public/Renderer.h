@@ -1,10 +1,5 @@
 #pragma once
-#include "Engine/SceneManager.h"
-#include <Interface/IRHI.h>
-#include <Math/kMath.hpp>
-#include <memory>
-#include <Core/Window.h>
-#include <Engine/Assets/MeshData.h>
+#include "RendererMinimal.h"
 
 namespace render
 {
@@ -29,7 +24,7 @@ namespace render
 		kMath::Mat4f	m_ModelMatrix;
 	};
 
-	class K3D_API RenderableMesh : public ::k3d::MeshData, public Renderable
+	class K3D_API RenderableMesh : public Renderable
 	{
 	public:
 		RenderableMesh();
@@ -45,7 +40,7 @@ namespace render
 		ERTDirect3D12,
 	};
 
-	using PtrRHIDevice = std::shared_ptr<NGFXDevice>;
+	using PtrRHIDevice = k3d::SharedPtr<NGFXDevice>;
 
 	/**
 	* Associated with RHI
