@@ -1,6 +1,4 @@
-#include "Kaleido3D.h"
-#include <Core/Os.h>
-#include <KTL/DynArray.hpp>
+#include "CoreMinimal.h"
 #include <mach/mach_host.h>
 #include <mach/processor_info.h>
 
@@ -51,7 +49,7 @@ int __UpdateCpuUsage(k3d::DynArray<__CPU_Ticks> & ticks)
 
 int __Init(void)
 {
-    cpuCount = Os::GetCpuCoreNum();
+    cpuCount = k3d::os::GetCpuCoreNum();
     usages.Resize(cpuCount);
     ticks.Resize(cpuCount);
     curTicks.Resize(cpuCount);

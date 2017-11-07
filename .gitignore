@@ -3,6 +3,7 @@
 *.lo
 *.o
 *.obj
+*.pyc
 cmake-build-debug
 Binary
 Lib

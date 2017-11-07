@@ -1,7 +1,4 @@
-#include "Kaleido3D.h"
-#include <Core/App.h>
-#include <Core/AssetManager.h>
-#include <KTL/String.hpp>
+#include "CoreMinimal.h"
 
 @implementation AppDelegate
 - (BOOL)application:(NSNotification*)notification didFinishLaunchingWithOptions:(NSDictionary*)launchOptions
