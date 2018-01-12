@@ -40,21 +40,25 @@ public:
     }
 
 
-    explicit StringBase(size_t preAllocSize) K3D_NOEXCEPT
+    explicit StringBase(I64 preAllocSize, bool bAssignLength = false) K3D_NOEXCEPT
         : m_pStringData(nullptr)
         , m_StringLength(0)
         , m_Capacity(preAllocSize)
     {
         m_pStringData = Allocate(m_Capacity);
+        if (bAssignLength)
+        {
+            m_StringLength = preAllocSize - 1; // Real String Length
+        }
     }
 
-    StringBase(size_t desiredSize, BaseChar holderChar) K3D_NOEXCEPT
+    StringBase(I64 desiredSize, BaseChar holderChar) K3D_NOEXCEPT
         : m_pStringData(nullptr)
         , m_StringLength(desiredSize)
         , m_Capacity(desiredSize)
     {
         m_pStringData = Allocate(m_Capacity);
-        for (size_t i = 0; i < m_Capacity; i++)
+        for (I64 i = 0; i < m_Capacity; i++)
         {
             m_pStringData[i] = holderChar;
         }
@@ -65,8 +69,8 @@ public:
         , m_StringLength(0)
         , m_Capacity(0)
     {
-        U64 calLength = szData / sizeof(BaseChar);
-        U64 remain = szData % sizeof(BaseChar);
+        I64 calLength = szData / sizeof(BaseChar);
+        I64 remain = szData % sizeof(BaseChar);
         if (remain == 0)
         {
             m_StringLength = calLength;
@@ -85,7 +89,7 @@ public:
         m_StringLength = CharLength(pStr);
         if (m_StringLength)
         {
-            m_Capacity = (U64)(1.5f * m_StringLength + 0.5f);
+            m_Capacity = (I64)(1.5f * m_StringLength + 0.5f);
             m_pStringData = Allocate(m_Capacity);
             memcpy(m_pStringData, pStr, m_StringLength * sizeof(BaseChar));
             m_pStringData[m_StringLength] = 0;
@@ -118,7 +122,8 @@ public:
         m_StringLength = 0;
     }
 
-    U64				Length() const { return m_StringLength; }
+    bool                Empty() const { return m_StringLength == 0; }
+    I64				    Length() const { return m_StringLength; }
     CharPointer	        Data() { return m_pStringData; }
     ConstCharPointer	Data() const { return m_pStringData; }
     ConstCharPointer	CStr() const { return m_pStringData; }
@@ -134,10 +139,9 @@ public:
     void				Swap(ThisString& rhs);
 
     void				Resize(CharPosition newSize);
-    CharPosition	    FindFirstOf(BaseChar _char) const;
-    CharPosition        FindFirstNotOf(BaseChar _BaseChar) const;
-    CharPosition        FindFirstNotOf(ThisString const& _Str) const;
-    CharPosition        FindLastOf(BaseChar _BaseChar) const;
+    CharPosition	    FindFirstOf(const BaseChar* Str) const;
+    CharPosition        FindFirstNotOf(const BaseChar* Str) const;
+    CharPosition        FindLastOf(const BaseChar* Str) const;
     CharPosition        FindLastNotOf(BaseChar _BaseChar) const;
     CharPosition        FindLastNotOf(ThisString const& _Str) const;
     CharPosition        Find(ConstCharPointer _Str, CharPosition StartPos = 0, CaseOption Opt = CaseSensitive) const;
@@ -147,6 +151,8 @@ public:
 
     ThisString          ToUpper() const;
     ThisString          ToLower() const;
+
+    static ThisString   Format(const BaseChar* fmt, ...);
 
     template <typename T, typename A>
     friend Archive&     operator<<(Archive & ar, StringBase<T,A> const& str);
@@ -163,8 +169,8 @@ protected:
 
 private:
     CharPointer			m_pStringData;
-    U64				    m_StringLength;
-    U64                 m_Capacity;
+    I64				    m_StringLength;
+    I64                 m_Capacity;
     Allocator			m_StringAllocator;
 };
 
@@ -218,7 +224,7 @@ KFORCE_INLINE void StringBase<BaseChar, Allocator>::Assign(StringBase<BaseChar, 
 }
 
 template <typename BaseChar, typename Allocator>
-KFORCE_INLINE StringBase<BaseChar, Allocator>&
+StringBase<BaseChar, Allocator>&
 StringBase<BaseChar, Allocator>::AppendSprintf(const BaseChar *fmt, ...)
 {
     va_list va;
@@ -229,7 +235,7 @@ StringBase<BaseChar, Allocator>::AppendSprintf(const BaseChar *fmt, ...)
     auto newLen = length + m_StringLength;
     if (newLen >= m_Capacity)
     {
-        m_Capacity = (U64)(1.33f * newLen + 1.0f);
+        m_Capacity = (I64)(1.33f * newLen + 1.0f);
         BaseChar* newString = Allocate(m_Capacity);
         memcpy(newString, m_pStringData, m_StringLength * sizeof(BaseChar));
 
@@ -245,6 +251,25 @@ StringBase<BaseChar, Allocator>::AppendSprintf(const BaseChar *fmt, ...)
     m_StringLength = newLen;
 
     return *this;
+}
+
+
+template <typename BaseChar, typename Allocator>
+StringBase<BaseChar, Allocator>
+StringBase<BaseChar, Allocator>::Format(const BaseChar *fmt, ...)
+{
+    static BaseChar Buffer[16] = { 0 };
+    va_list va;
+    va_start(va, fmt);
+    int PreAllocLength = Vsnprintf(Buffer, 16, fmt, va);
+    va_end(va);
+
+    StringBase<BaseChar, Allocator> FormatedString(PreAllocLength + 1, true);
+    va_list newVa;
+    va_start(newVa, fmt);
+    Vsnprintf(FormatedString.Data(), PreAllocLength + 1, fmt, newVa);
+    va_end(newVa);
+    return FormatedString;
 }
 
 template <typename BaseChar, typename Allocator>
@@ -270,7 +295,7 @@ KFORCE_INLINE void StringBase<BaseChar, Allocator>::Swap(StringBase<BaseChar, Al
 template <typename BaseChar, typename Allocator>
 KFORCE_INLINE void StringBase<BaseChar, Allocator>::Resize(CharPosition newSize)
 {
-    auto newCapacity = (U64)(1.1f * newSize + 1.0f);
+    auto newCapacity = (I64)(1.1f * newSize + 1.0f);
     if (newCapacity > m_Capacity)
     {
         m_Capacity = newCapacity;
@@ -331,7 +356,7 @@ StringBase<BaseChar, Allocator>::operator+=(BaseChar const& rhs)
     auto newLen = m_StringLength + 1;
     if (newLen >= m_Capacity)
     {
-        m_Capacity = U64(1.5*newLen + 1);
+        m_Capacity = I64(1.5*newLen + 1);
         auto pNewData = Allocate(m_Capacity);
         if (m_pStringData)
         {
@@ -386,13 +411,17 @@ KFORCE_INLINE bool operator==(StringBase<BaseChar, Allocator> const& lhs, String
 
 template <typename BaseChar, typename Allocator>
 KFORCE_INLINE typename StringBase<BaseChar, Allocator>::CharPosition
-  StringBase<BaseChar, Allocator>::FindFirstOf(BaseChar _BaseChar) const
+  StringBase<BaseChar, Allocator>::FindFirstOf(const BaseChar* Str) const
 {
+  auto Len = CharLength(Str);
   StringBase<BaseChar, Allocator>::CharPosition p = 0;
   while (p < m_StringLength)
   {
-    if (m_pStringData[p] == _BaseChar)
-      return p;
+    for (U64 i = 0; i < Len; i++)
+    {
+      if (m_pStringData[p] == Str[i])
+        return p;
+    }
     ++p;
   }
   return StringBase<BaseChar, Allocator>::npos;
@@ -400,30 +429,20 @@ KFORCE_INLINE typename StringBase<BaseChar, Allocator>::CharPosition
 
 template <typename BaseChar, typename Allocator>
 KFORCE_INLINE typename StringBase<BaseChar, Allocator>::CharPosition
-StringBase<BaseChar, Allocator>::FindFirstNotOf(BaseChar _BaseChar) const
+StringBase<BaseChar, Allocator>::FindFirstNotOf(const BaseChar* Str) const
 {
+  auto Len = CharLength(Str);
   CharPosition p = 0;
   while (p < m_StringLength)
   {
-    if (m_pStringData[p] != _BaseChar)
-      return p;
+    for (U64 i = 0; i < Len; i++)
+    {
+      if (m_pStringData[p] != Str[i])
+        return p;
+    }
     ++p;
   }
   return StringBase<BaseChar, Allocator>::npos;
-}
-
-template <typename BaseChar, typename Allocator>
-KFORCE_INLINE typename StringBase<BaseChar, Allocator>::CharPosition
-StringBase<BaseChar, Allocator>::FindFirstNotOf(ThisString const& _Str) const
-{
-    CharPosition p = 0;
-    while (p < (CharPosition)m_StringLength)
-    {
-        if (m_pStringData[p] != _Str[0])
-            return p;
-        ++p;
-    }
-    return StringBase<BaseChar, Allocator>::npos;
 }
 
 template <typename BaseChar, typename Allocator>
@@ -458,14 +477,18 @@ StringBase<BaseChar, Allocator>::FindLastNotOf(ThisString const& _Str) const
 
 template <typename BaseChar, typename Allocator>
 KFORCE_INLINE typename StringBase<BaseChar, Allocator>::CharPosition
-StringBase<BaseChar, Allocator>::FindLastOf(BaseChar _BaseChar) const
+StringBase<BaseChar, Allocator>::FindLastOf(const BaseChar* Str) const
 {
     CharPosition p = m_StringLength - 1;
     while (p != StringBase<BaseChar, Allocator>::npos
         && p >= 0)
     {
-        if (m_pStringData[p] == _BaseChar)
-            return p;
+        auto Len = CharLength(Str);
+        for (U64 i = 0; i < Len; i++)
+        {
+            if (m_pStringData[p] == Str[i])
+                return p;
+        }
         --p;
     }
     return StringBase<BaseChar, Allocator>::npos;

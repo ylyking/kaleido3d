@@ -3,7 +3,6 @@
 
 namespace k3d
 {
-
     class SystemAllocator : public IAllocatorAdapter
     {
     public:
@@ -44,37 +43,32 @@ namespace k3d
     }
 }
 
-K3D_CORE_API void* __k3d_malloc__(size_t sizeOfObj)
+K3D_CORE_API void* k3d_malloc(size_t SzObj)
 {
-	return malloc(sizeOfObj);
+	return k3d::GetDefaultAllocator().Alloc(SzObj);
 }
 
-K3D_CORE_API void __k3d_free__(void *p, size_t sizeOfObj)
+K3D_CORE_API void* k3d_malloc_aligned(size_t SzObj, size_t Align)
 {
-	free(p);
+    return k3d::GetDefaultAllocator().Alloc(SzObj, Align);
+}
+
+K3D_CORE_API void k3d_free(void *p, size_t sizeOfObj)
+{
+    return k3d::GetDefaultAllocator().DeAlloc(p);
 }
 
 K3D_CORE_API void* operator new[](size_t size, const char* pName)
 {
-	return __k3d_malloc__(size);
+	return k3d_malloc(size);
 }
 
 K3D_CORE_API void* operator new(size_t Size, const char* _ClassName, const char* _SourceFile, int _SourceLine)
 {
-  return __k3d_malloc__(Size);
+  return k3d_malloc(Size);
 }
 
 K3D_CORE_API void operator delete(void* _Ptr, const char* _SourceFile, int _SourceLine)
 {
-    __k3d_free__(_Ptr, 0);
+    k3d_free(_Ptr, 0);
 }
-
-//K3D_CORE_API void* operator new[](size_t size)
-//{
-//    return __k3d_malloc__(size);
-//}
-
-//K3D_CORE_API void operator delete(void* _Ptr)
-//{
-//    __k3d_free__(_Ptr, -1);
-//}

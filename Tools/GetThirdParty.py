@@ -12,9 +12,37 @@ parser.add_argument('--target_os', help='available os are \'Windows\',\'WindowsU
 
 args = parser.parse_args(sys.argv[1:])
 
-third_party_urls = {
-    'Windows': 'https://ci.appveyor.com/api/projects/tomicyo/third-party/artifacts/artifacts/third_party_windows.zip',
-    'Android': 'https://ci.appveyor.com/api/projects/tomicyo/third-party/artifacts/artifacts/third_party_android_arm64-v8a_gnustl_shared.zip'
-}
+libs = [
+    {
+        'name'  : 'third_party_c',
+        'win64' : 
+        {
+            'url'   : 'https://ci.appveyor.com/api/projects/tomicyo/third-party-clibs/artifacts/build/third_party_clibs_windows.zip'
+        }
+    },
+    {
+        'name'  : 'third_party',
+        'win64' : 
+        {
+            'url'   : 'https://ci.appveyor.com/api/projects/tomicyo/third-party/artifacts/artifacts/third_party_windows.zip'    
+        }
+    },
+    {
+        'name'  : 'protobuf',
+        'win64' : 
+        {
+            'url'   : 'https://ci.appveyor.com/api/buildjobs/ic77nh5lpobvkmxw/artifacts/output%2Fprotobuf_md_windows.zip'
+        }
+    },
+    {
+        'name'  : 'grpc',
+        'win64' : 
+        {
+            'url'   : 'https://ci.appveyor.com/api/projects/tomicyo/grpc/artifacts/output/grpc_windows.zip'
+        }
+    }
+]
 
-download_and_extract(third_party_urls[args.target_os], args.output_dir)
+for lib in libs:
+    download_and_extract(lib['win64']['url'], args.output_dir)
+

@@ -15,8 +15,8 @@ namespace k3d
             virtual				~WebSocket();
 
             os::Socket*	        Accept(os::IpAddress const& Ip) override;
-            U64				    Receive(void * pData, U64 recvLen) override;
-            U64				    Send(const char * pData, U64 sendLen) override;
+            I32				    Receive(void * pData, I32 recvLen) override;
+            I32				    Send(const char * pData, I32 sendLen) override;
 
         protected:
             WebSocketImpl*      d;

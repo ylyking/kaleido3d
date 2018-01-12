@@ -35,4 +35,13 @@ namespace k3d
     private:
         T m_Value;
     };
+
+    class AtomicBool 
+    {
+    public:
+        AtomicBool(bool InVal) : m_Value(false) {}
+
+    private:
+        bool m_Value;
+    };
 }

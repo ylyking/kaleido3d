@@ -1,8 +1,13 @@
 #pragma once
-
-extern K3D_CORE_API void* __k3d_malloc__(size_t sizeOfObj);
-extern K3D_CORE_API void __k3d_free__(void *p, size_t sizeOfObj);
-
+#if __cplusplus
+extern "C" {
+#endif
+extern K3D_CORE_API void*   k3d_malloc(size_t SzOfObj);
+extern K3D_CORE_API void*   k3d_malloc_aligned(size_t SzOfObj, size_t Alignment);
+extern K3D_CORE_API void    k3d_free(void *Ptr, size_t SzOfObj);
+#if __cplusplus
+}
+#endif
 extern K3D_CORE_API void* operator new(size_t Size, const char* _ClassName, const char* _SourceFile, int _SourceLine);
 extern K3D_CORE_API void* operator new[](size_t Size, const char* pName);
 extern K3D_CORE_API void operator delete(void* _Ptr, const char* _SourceFile, int _SourceLine);

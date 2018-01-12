@@ -1,6 +1,11 @@
 #include "CoreMinimal.h"
 #include <mach/mach_host.h>
 #include <mach/processor_info.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
+
+namespace k3d
+{
 
 struct __CPU_Ticks
 {
@@ -77,10 +82,32 @@ float* __GetCpuUsage()
 }
 
 
-namespace Os
+namespace os
 {
+    int GetCpuCount()
+    {
+        static I32 numCores = -1;
+        if(numCores == -1)
+        {
+            size_t size = sizeof(I32);
+            if(sysctlbyname("hw.ncpu", &numCores, &size, NULL, 0) != 0)
+            {
+                numCores = 1;
+            }
+        }
+        return numCores;
+    }
+    
+    U32 GetGpuCount()
+    {
+        return 1;
+    }
+    
     float* GetCpuUsage()
     {
         return __GetCpuUsage();
     }
-}
+    
+} // os
+    
+} // k3d

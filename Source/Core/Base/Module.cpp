@@ -24,14 +24,11 @@ namespace k3d
 
 	ModuleManager::~ModuleManager()
 	{
-		KLOG(Info, ModuleManager, "Destroyed");
 		p->g_IsInited = false;
 		if (!p->g_ModuleMap.empty())
 		{
 			p->g_ModuleMap.clear();
 		}
-		//KLOG(Info, ModuleManager, "Destroyed");
-
 #if K3DPLATFORM_OS_WINDOWS
 		if (!p->g_Win32ModuleMap.empty())
 		{

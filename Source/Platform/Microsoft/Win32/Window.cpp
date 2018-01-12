@@ -18,8 +18,8 @@ namespace k3d
             String FileName(512);
             GetModuleFileNameA(NULL, (LPSTR)FileName.Data(), 512);
             FileName.ReCalculate();
-            auto Pos = FileName.FindLastOf('.');
-            auto BeginPos = FileName.FindLastOf('\\');
+            auto Pos = FileName.FindLastOf(".");
+            auto BeginPos = FileName.FindLastOf("\\");
             InstanceName = FileName.SubStr(BeginPos + 1, Pos - BeginPos - 1);
             ExecutableDir = FileName.SubStr(0, BeginPos);
             
@@ -29,7 +29,7 @@ namespace k3d
             String CurrentPath = ExecutableDir;
             while (INVALID_HANDLE_VALUE == hFind)
             {
-                auto NewPos = CurrentPath.FindLastOf('\\');
+                auto NewPos = CurrentPath.FindLastOf("\\");
                 if (NewPos == String::npos)
                 {
                     DataDir = ".";

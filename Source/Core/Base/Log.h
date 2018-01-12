@@ -15,11 +15,12 @@ namespace k3d
 		Profile
 	};
 
-	class ILogger
-	{
-	public:
-		virtual ~ILogger() {}
-		virtual void Log(ELogLevel const &, const char * tag, const char *) = 0;
+    class ILogger
+    {
+    public:
+        virtual ~ILogger() {}
+        virtual bool IsCancelled() const { return false; }
+        virtual void Log(ELogLevel const &, const char * tag, const char *) = 0;
 	};
 
 	enum class ELoggerType : U32

@@ -233,11 +233,11 @@ namespace k3d
             {
                 void* operator new(size_t Size)
                 {
-                    return __k3d_malloc__(Size);
+                    return k3d_malloc(Size);
                 }
                 void operator delete(void * Ptr)
                 {
-                    __k3d_free__(Ptr, 0);
+                    k3d_free(Ptr, 0);
                 }
             };
 
@@ -286,9 +286,10 @@ namespace k3d
             Thread();
 
             template <class F> explicit Thread(F f, k3d::String const& Name,
-                ThreadPriority Priority = ThreadPriority::Normal)
+                ThreadPriority Priority = ThreadPriority::Normal, I32 CpuId = -1)
                 : m_ThreadName(Name)
                 , m_ThreadPriority(Priority)
+                , m_CoreId(CpuId)
                 , m_StackSize(2048)
                 , m_ThreadStatus(ThreadStatus::Ready)
                 , m_ThreadHandle(nullptr)
@@ -298,7 +299,7 @@ namespace k3d
             }
 
             explicit Thread(k3d::String const& name,
-                ThreadPriority priority = ThreadPriority::Normal);
+                ThreadPriority priority = ThreadPriority::Normal, I32 CpuId = -1);
 
             virtual ~Thread();
 
@@ -324,6 +325,7 @@ namespace k3d
 
             k3d::String                 m_ThreadName;
             ThreadPriority              m_ThreadPriority;
+            I32                         m_CoreId;
             U32                         m_StackSize;
             ThreadStatus                m_ThreadStatus;
             Handle                      m_ThreadHandle;
@@ -342,7 +344,14 @@ namespace k3d
                 V4,
                 V6
             };
-
+            /**
+             * Support formats:
+             * 10.0.0.1:5111
+             * [1000::ddff::eeef::222]:80
+             * :50000
+             * tcp:3666
+             * udp:8999
+             */
             explicit IpAddress(String const& Ip);
             ~IpAddress();
 
@@ -394,17 +403,17 @@ namespace k3d
             void SetTimeOutOpt(SoToOpt opt, U32 milleseconds);
             void SetBlocking(bool block);
 
-            virtual U64 Receive(void* pData, U64 recvLen);
-            virtual U64 Send(const char* pData, U64 sendLen);
-            virtual U64 Send(String const& buffer);
-
-        protected:
-            void Create();
-            void Bind(IpAddress const& ipAddr);
-            void Listen(int maxConn);
-            virtual void Connect(IpAddress const& ipAddr);
+            virtual I32 Receive(void* pData, I32 recvLen);
+            virtual I32 Send(const char* pData, I32 sendLen);
+            virtual I32 Send(String const& buffer);
+            virtual bool Connect(IpAddress const& ipAddr);
             virtual void Close();
             virtual Socket* Accept(IpAddress const& ipAddr);
+
+            void Bind(IpAddress const& ipAddr);
+            void Listen(int maxConn);
+        protected:
+            void Create();
             //SocketHandle GetHandle() { return m_SockFd; }
             virtual I32 GetError();
             virtual void OnHandleError(int Code);

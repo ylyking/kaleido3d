@@ -289,6 +289,7 @@ namespace k3d
     ElementType const* Data() const { return m_pElement; }
 
     U64 Count() const { return m_ElementCount; }
+    U64 Capacity() const { return m_Capacity; }
 
     bool Contains(ElementType const& item) const
     {

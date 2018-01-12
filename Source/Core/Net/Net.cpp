@@ -76,7 +76,7 @@ namespace k3d
                 if (d->ParseHandshake(buffer, recvLen) == OPENING_FRAME)
                 {
                     k3d::String answer = d->AnswerHandshake();
-                    U64 sent = NewSock->Send(answer);
+                    I32 sent = NewSock->Send(answer);
                     if (sent == answer.Length())
                     {
                         return NewSock;
@@ -86,10 +86,10 @@ namespace k3d
             return NewSock;
         }
 
-        U64 WebSocket::Receive(void * pData, U64 recvLen)
+        I32 WebSocket::Receive(void * pData, I32 recvLen)
         {
             unsigned char buffer[BUF_SIZE] = { 0 };
-            U64 realRecvLen = Receive(buffer, BUF_SIZE);
+            I32 realRecvLen = Receive(buffer, BUF_SIZE);
             if (realRecvLen < BUF_SIZE) // received all data
             {
                 int out_length = 0;
@@ -100,19 +100,19 @@ namespace k3d
                 }
                 else
                 {
-                    return (U64)-1;
+                    return -1;
                 }
             }
             return 0;
         }
 
-        U64 WebSocket::Send(const char * pData, U64 sendLen)
+        I32 WebSocket::Send(const char * pData, I32 sendLen)
         {
             unsigned char buffer[BUF_SIZE] = { 0 };
             int realSize = d->MakeFrame(d->m_CurrentFameType, pData, (int)sendLen, buffer, BUF_SIZE);
             if (realSize < BUF_SIZE)
             {
-                U64 sent = Send((const char*)buffer, realSize);
+                I32 sent = Send((const char*)buffer, realSize);
                 if (sent == realSize)
                 {
                     return sent;
@@ -161,10 +161,10 @@ namespace k3d
         k3d::String WebSocketImpl::Trim(k3d::String str)
         {
             String whitespace = " \t\r\n";
-            auto pos = str.FindLastNotOf(whitespace);
+            auto pos = str.FindLastNotOf(*whitespace);
             if (pos != String::npos) {
                 str.Erase(pos + 1);
-                pos = str.FindFirstNotOf(whitespace);
+                pos = str.FindFirstNotOf(*whitespace);
                 if (pos != String::npos)
                 {
                     str.Erase(0, pos);

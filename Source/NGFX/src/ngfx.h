@@ -816,7 +816,7 @@ struct NamedObject : public RefCounted<ThreadSafe>
 protected:
   void operator delete (void * Ptr)
   {
-    __k3d_free__(Ptr, 0);
+    k3d_free(Ptr, 0);
   }
 };
 template <class NGFXObj>

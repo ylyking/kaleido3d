@@ -48,6 +48,123 @@ namespace k3d
 #endif
         }
 
+        KFORCE_INLINE float GetFloat(V4F & a, int c)
+        {
+            return *((float*)(&a) + c);
+        }
+
+        KFORCE_INLINE I32 GetInt(V4I & a, int c)
+        {
+            return *((I32*)(&a) + c);
+        }
+
+        /// Logic Ops
+
+        KFORCE_INLINE V4I And(V4I & a, V4I & b)
+        {
+#if K3D_USE_SSE
+            return _mm_and_si128(a, b);
+#elif K3D_USE_NEON
+            return vandq_s32(a, b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4F And(V4F & a, V4F & b)
+        {
+#if K3D_USE_SSE
+            return _mm_and_ps(a, b);
+#elif K3D_USE_NEON
+            return (V4F)vandq_u32((V4I)a, (V4I)b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4I Or(V4I & a, V4I & b)
+        {
+#if K3D_USE_SSE
+            return _mm_or_si128(a, b);
+#elif K3D_USE_NEON
+            return vorrq_s32(a, b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4F Or(V4F & a, V4F & b)
+        {
+#if K3D_USE_SSE
+            return _mm_or_ps(a, b);
+#elif K3D_USE_NEON
+            return (V4F)vorrq_u32((V4I)a, (V4I)b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4I Xor(V4I & a, V4I & b)
+        {
+#if K3D_USE_SSE
+            return _mm_xor_si128(a, b);
+#elif K3D_USE_NEON
+            return veorq_s32(a, b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4F Xor(V4F & a, V4F & b)
+        {
+#if K3D_USE_SSE
+            return _mm_xor_ps(a, b);
+#elif K3D_USE_NEON
+            return (V4F)veorq_u32((V4I)a, (V4I)b);
+#else
+#endif
+        }
+        /*
+        KFORCE_INLINE V4I Not(V4I & a)
+        {
+#if K3D_USE_SSE
+#elif K3D_USE_NEON
+            return vmvnq_s32(a);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4I AndNot(V4I & a, V4I & b)
+        {
+#if K3D_USE_SSE
+#elif K3D_USE_NEON
+            return vandq_s32(vmvnq_s32(a), b);
+#else
+#endif
+        }
+        */
+        /// Logic Ops End
+
+        /// Comparison
+
+
+        /// Comparison End
+
+        KFORCE_INLINE V4F Select(V4F & a, V4F & b, V4F & m)
+        {
+#if K3D_USE_SSE
+            return _mm_xor_ps(b, _mm_and_ps(m, _mm_xor_ps(a, b)));
+#elif K3D_USE_NEON
+            return vbslq_f32((V4I)m, a, b);
+#else
+#endif
+        }
+
+        KFORCE_INLINE V4I Select(V4I & a, V4I & b, V4I & m)
+        {
+#if K3D_USE_SSE
+            return _mm_xor_si128(b, _mm_and_si128(m, _mm_xor_si128(a, b)));
+#elif K3D_USE_NEON
+            return vloadq_f32(Ptr);
+#else
+#endif
+        }
+
         KFORCE_INLINE V4F Add(V4F & a, V4F & b) {
 #if K3D_USE_SSE
             return _mm_add_ps(a, b);
@@ -58,9 +175,29 @@ namespace k3d
 #endif
         }
 
+        KFORCE_INLINE V4I Add(V4I & a, V4I & b) {
+#if K3D_USE_SSE
+            return _mm_add_epi32(a, b);
+#elif K3D_USE_NEON
+            return vaddq_s32(a, b);
+#else
+
+#endif
+        }
+
         KFORCE_INLINE V4F Subtract(V4F & a, V4F & b) {
 #if K3D_USE_SSE
             return _mm_sub_ps(a, b);
+#elif K3D_USE_NEON
+            return vsubq_s32(a, b);
+#else
+
+#endif
+        }
+
+        KFORCE_INLINE V4I Subtract(V4I & a, V4I & b) {
+#if K3D_USE_SSE
+            return _mm_sub_epi32(a, b);
 #elif K3D_USE_NEON
             return vsubq_f32(a, b);
 #else

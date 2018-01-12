@@ -92,7 +92,7 @@ namespace k3d
 		void FreeRefCountVal() K3D_NOEXCEPT override 
 		{
 			this->~TRefCount();
-			__k3d_free__(this, sizeof(*this));
+			k3d_free(this, sizeof(*this));
 		}
 
 		void* GetDeleter() const
@@ -125,7 +125,7 @@ namespace k3d
 		void FreeRefCountVal() K3D_NOEXCEPT override 
 		{
 			this->~TRefCountInstance();
-			__k3d_free__(this, sizeof(*this));
+			k3d_free(this, sizeof(*this));
 		}
 	};
 

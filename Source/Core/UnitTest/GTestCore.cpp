@@ -21,7 +21,7 @@ TEST(os, sys)
 
 TEST(os, thread)
 {
-    auto file = MakeSharedMacro(os::File);
+    auto file = MakeShared<os::File>();
     auto thread = MakeSharedMacro(os::Thread, [file]()
     {
         os::Sleep(1000);
@@ -34,11 +34,11 @@ TEST(core, string)
 {
     String testString("HeyYou!");
     EXPECT_EQ(testString.Length(), 7);
-    EXPECT_EQ(testString.FindFirstOf('Y'), 3);
+    EXPECT_EQ(testString.FindFirstOf("Y"), 3);
     EXPECT_EQ(testString.Find("Ys"), String::npos);
     EXPECT_EQ(testString.Find("Yo"), 3);
-    EXPECT_EQ(testString.FindLastOf('y'), 2);
-    EXPECT_EQ(testString.FindLastNotOf('u'), 6);
+    EXPECT_EQ(testString.FindLastOf("y"), 2);
+    EXPECT_EQ(testString.FindLastNotOf("u"), 6);
 
     testString.AppendSprintf("%.2f %s", 1.5f, "Soo");
     EXPECT_EQ(testString, String("HeyYou!1.50 Soo"));
@@ -75,6 +75,11 @@ TEST(core, array)
     strings.Append("kkkkk");
     EXPECT_EQ(strings[7], String("kkkkk"));
     EXPECT_TRUE(strings.Contains("Right____"));
+
+    CircularBuffer<int> CBuffer(20);
+    CircularQueue<int>  CQueue(20);
+    EXPECT_EQ(CBuffer.Capacity(), 20);
+    EXPECT_EQ(CQueue.Capacity(), 20);
 }
 
 TEST(core, sharedptr)
@@ -93,6 +98,44 @@ TEST(core, sharedptr)
         auto pTest = MakeSharedMacro(spTest, counter);
     }
     EXPECT_EQ(-1, counter);
+}
+
+TEST(core, regex)
+{
+    // Simple
+    RegEx reg("\"(.*)\"", RegEx::Default);
+    EXPECT_TRUE(reg.Match("ddff d=\"fhbdhfdhfh\""));
+    EXPECT_TRUE(!reg.Match("gfdgfgfg"));
+
+    // Group with all names
+    RegEx reg_group("\\[(?<key>(.*))\\]:\\s\\[(?<value>(.*))\\]\\n", RegEx::IgnoreCase);
+    RegEx::Groups matched_group;
+    EXPECT_TRUE(reg_group.Match("[ro.build.version.release]: [8.0.0]\n"
+        "[ro.build.version.sdk] : [26]\n"
+        "[ro.product.manufacturer] : [Xiaomi]\n"
+        "[ro.product.model] : [MI 6]\n", matched_group));
+
+    matched_group[0].SubGroup(0);
+    auto val = matched_group[0].SubGroup("key");
+
+    // Group 2 without names
+    RegEx reg_group2("\\[(.*)\\]:\\s\\[(.*)\\]\\n", RegEx::IgnoreCase);
+    RegEx::Groups matched_group2;
+    EXPECT_TRUE(reg_group2.Match("[ro.build.version.release]: [8.0.0]\n"
+        "[ro.build.version.sdk] : [26]\n"
+        "[ro.product.manufacturer] : [Xiaomi]\n"
+        "[ro.product.model] : [MI 6]\n", matched_group2));
+
+
+    // Group 3 without names
+    RegEx reg_group3("\\[(.*)\\]:\\s\\[(?<value>(.*))\\]\\n", RegEx::IgnoreCase);
+    RegEx::Groups matched_group3;
+    EXPECT_TRUE(reg_group3.Match("[ro.build.version.release]: [8.0.0]\n"
+        "[ro.build.version.sdk] : [26]\n"
+        "[ro.product.manufacturer] : [Xiaomi]\n"
+        "[ro.product.model] : [MI 6]\n", matched_group3));
+    auto newVal = matched_group3[0].SubGroup("value");
+    EXPECT_EQ(String("8.0.0"), newVal);
 }
 
 // ADB
@@ -141,7 +184,7 @@ TEST(core, simd)
     V4F data = simd::MakeFloat4(1.0f, 0.5f, 1.0f, 0.1f);
     data = simd::Add(data, data);
     data = simd::Max(data, simd::MakeFloat4(1.0f));
-    EXPECT_EQ(data.m128_f32[0], 2.0f);
+    EXPECT_EQ(simd::GetFloat(data, 0), 2.0f);
 }
 
 TEST(core, math)
@@ -149,6 +192,15 @@ TEST(core, math)
     math::TVector<float, 4> Vector4 = {1.0f, 0.4f, 0.2f, 1.0f};
     math::TMatrixN<float, 4> Mat4;
     Vector4 = Mat4 * Vector4;
+}
+
+TEST(core, lockfree_queue)
+{
+    k3d::LockFreeQueue<String> queue;
+    queue.Enqueue("dsdsdgv");
+    String Info;
+    queue.Dequeue(Info);
+    EXPECT_EQ(7, Info.Length());
 }
 
 struct ZTile

@@ -7,6 +7,8 @@
 #define K3DPLATFORM_OS_UNIX (K3DPLATFORM_OS_LINUX || K3DPLATFORM_OS_MAC || K3DPLATFORM_OS_IOS || K3DPLATFORM_OS_ANDROID)
 #define K3DPLATFORM_OS_APPLE (K3DPLATFORM_OS_MAC || K3DPLATFORM_OS_IOS)
 
+#include <stdint.h>
+
 /** Compiler Definiotions **/
 #if K3DPLATFORM_OS_WINDOWS
 #ifdef _MSC_VER
@@ -22,10 +24,21 @@
 	#pragma intrinsic (_InterlockedDecrement)
 	extern "C" long _InterlockedCompareExchange(long volatile* Dest, long Exchange, long Comp);
 	#pragma intrinsic (_InterlockedCompareExchange)
+
+    // 64 bits
+    extern "C" int64_t _InterlockedCompareExchange64(int64_t volatile* Dest, int64_t Exchange, int64_t Comp);
+    #pragma intrinsic (_InterlockedCompareExchange64)
+    extern "C" void * _InterlockedCompareExchangePointer(
+        void * volatile * Destination,
+        void * Exchange,
+        void * Comparand
+    );
+    #pragma intrinsic (_InterlockedCompareExchangePointer)
   #endif
 	#define KRESTRICT __restrict
 	#define KFORCE_INLINE __forceinline
 	#define FARMHASH_NO_BUILTIN_EXPECT
+    #define KPACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
 #endif
 #endif
 
@@ -38,6 +51,7 @@
   #define KFORCE_INLINE inline
   #define KRESTRICT __restrict__
   #define K3DCOMPILER_VERSION (__GNUC__ * 1000 + __GNUC_MINOR__)
+  #define KPACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
 #endif
 /*** End Compiler Detection ***/
 
@@ -53,7 +67,6 @@
 #define K3D_UNUSED(x) (void)x
 
 #if K3DPLATFORM_OS_WINDOWS
-//#pragma comment(linker, "/SUBSYSTEM:CONSOLE")
 	#if defined(LIB_BUILD)
 		#if defined(BUILD_SHARED_LIB)
 			#define K3D_CORE_API __declspec(dllexport)
@@ -102,7 +115,6 @@
 #define __K3D_FUNC__ __func__
 #endif
 
-#include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
 
@@ -153,7 +165,7 @@ namespace __intrinsics__
 #if defined(K3DCOMPILER_CLANG) || (defined(K3DCOMPILER_GCC) && K3DCOMPILER_VERSION > 4003)
 		return __sync_bool_compare_and_swap(i32, condition, newValue);
 #elif defined(K3DCOMPILER_MSVC)
-		return ((int32_t)_InterlockedCompareExchange((volatile long*)i32, (long)newValue, (long)condition) == condition);
+		return ((long)_InterlockedCompareExchange((volatile long*)i32, (long)newValue, (long)condition) == condition);
 #elif defined(K3DCOMPILER_GCC)
 		int32_t result;
 		__asm__ __volatile__(
@@ -172,6 +184,32 @@ namespace __intrinsics__
 		return false;
 #endif
 	}
+
+    inline bool AtomicCAS64(int64_t* i64, int64_t newValue, int64_t comparand)
+    {
+#if defined(K3DCOMPILER_MSVC)
+        return _InterlockedCompareExchange64(i64, newValue, comparand) == comparand;
+#else
+
+#endif
+    }
+
+    /*
+     * @param Destination
+     * @param NewValue to assign
+     * @param OldValue to compare
+     */
+    inline bool AtomicCASPointer(
+        void ** Destination,
+        void * NewValue,
+        void * OldValue)
+    {
+#if defined(K3DCOMPILER_MSVC)
+        return _InterlockedCompareExchangePointer((void*volatile*)Destination, NewValue, OldValue) == OldValue;
+#else
+
+#endif
+    }
 }
 
 // The follow include order cannot be modified, otherwise could cause massive compiler errors !!
@@ -191,17 +229,21 @@ namespace __intrinsics__
 #include "KTL/Allocator.h"
 #include "KTL/Atomic.h"
 #include "KTL/DynArray.h"
+#include "KTL/Circular.h"
 #include "KTL/String.h"
 #include "KTL/SharedPtr.h"
 
 #include "Base/Module.h"
 #include "Base/Log.h"
 #include "Base/Encoder.h"
+#include "Base/Regex.h"
 #include "Base/Profiler/Profiler.h"
 
 #include "XPlatform/App.h"
 #include "XPlatform/Os.h"
 #include "XPlatform/Window.h"
+
+#include "KTL/LockFreeQueue.h"
 
 #include "Net/Net.h"
 

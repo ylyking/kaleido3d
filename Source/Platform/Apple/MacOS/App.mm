@@ -56,7 +56,7 @@ namespace k3d {
       [path release];
       path = [[NSString alloc] initWithString:[bundle executablePath]];
       String exePath = [path UTF8String];
-      auto sepPos = exePath.FindLastOf('/');
+      auto sepPos = exePath.FindLastOf("/");
       AppName = exePath.SubStr(sepPos+1, exePath.Length()-sepPos);
       [path release];
     }

@@ -17,6 +17,8 @@ set(BASE_SRCS
     Base/Module.h
     Base/Module.cpp
     Base/Version.h
+    Base/Regex.h
+    Base/Regex.cpp
     Base/Profiler/Profiler.h
     Base/Profiler/Profiler.cpp
     Base/Memory/MemoryImpl.cpp
@@ -76,11 +78,13 @@ if(WINUWP)
     source_group("XPlatform\\WindowsUWP" FILES ${WINDOWS_IMPL_SRCS} ${Core_RC})
     generate_win_res(Core VER "1.0.0.1" DESC "Kernel Module")
     set(CORE_SRCS ${CORE_SRCS} ${WINDOWS_IMPL_SRCS} ${Core_RC} ${MATH_SRCS})
+    list(APPEND CORE_DEP_LIBS pcre2)
 elseif(WIN32)
     generate_win_res(Core VER "1.0.0.1" DESC "Kernel Module")
     file(GLOB WINDOWS_IMPL_SRCS "../Platform/Microsoft/Win32/*.cpp" "../Platform/Microsoft/Win32/*.h")
     source_group("XPlatform\\Windows" FILES ${WINDOWS_IMPL_SRCS} ${Core_RC})
     set(CORE_SRCS ${CORE_SRCS} ${WINDOWS_IMPL_SRCS} ${Core_RC} ${MATH_SRCS})
+    list(APPEND CORE_DEP_LIBS pcre2)
 elseif(ANDROID)
     file(GLOB ANDROID_SRCS "../Platform/Android/cpp/*.cpp" "../Platform/Android/cpp/*.h")
     source_group("XPlatform\\Android" FILES ${ANDROID_SRCS})

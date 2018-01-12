@@ -191,7 +191,7 @@ namespace k3d
 		void AllocInternal(U* pValue, Deleter deleter)
 		{
 			typedef TRefCount<U*, Deleter> RefCountT;
-			void* const pMemory = __k3d_malloc__(sizeof(RefCountT));
+			void* const pMemory = k3d_malloc(sizeof(RefCountT));
 			if(pMemory)
 			{
 				m_pRefCount = ::new(pMemory) RefCountT(pValue, Move(deleter));
@@ -224,7 +224,7 @@ namespace k3d
 	{
 		typedef TRefCountInstance<T> RCT;
 		SharedPtr<T> sharedPtr;
-		void* const pMemory = __k3d_malloc__(sizeof(RCT));
+		void* const pMemory = k3d_malloc(sizeof(RCT));
 		if(pMemory)
 		{
 			RCT* pRefCount = ::new(pMemory) RCT(Forward<Args>(args)...);

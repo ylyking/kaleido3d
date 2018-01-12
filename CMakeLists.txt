@@ -37,6 +37,8 @@ else()
 endif()
 
 include(${K3D_DEPENDS_PATH}/lib/cmake/third_party.cmake)
+include(${K3D_DEPENDS_PATH}/third_party_clibs.cmake)
+include(${K3D_DEPENDS_PATH}/grpc.cmake)
 #find_package(ThirdParty)
 find_package(LibClang)
 find_package(PythonInterp)
@@ -50,6 +52,7 @@ option(BUILD_WITH_OPENSSL "With OpenSSL Support" ON)
 option(BUILD_WITH_UNIT_TEST "Build With Unit Test" ON)
 #option(BUILD_NGFX "Build NGFX Standalone Library" OFF)
 option(ENABLE_SHAREDPTR_TRACK "Enable SharedPtr Track" OFF)
+option(BUILD_MOBILE_TOOLS "Build Mobile Tools" ON)
 
 if(IOS OR MACOS)
 	set(LIB_DIR @loader_path/../Frameworks)
@@ -159,6 +162,8 @@ Project/FindThirdParty.cmake
 Project/Platform.cmake
 )
 
+include_directories(Source)
+
 add_subdirectory(Source/Core)
 #add_subdirectory(Source/Log)
 #add_subdirectory(Source/Renderer)
@@ -188,14 +193,24 @@ if(LibClang_FOUND)
 #	add_subdirectory(Tools/CppReflector)
 endif(LibClang_FOUND)
 
+
+if(Qt5_DIR)
+	find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+endif()
+
 if(BUILD_WITH_EDITOR AND (NOT Qt5_FOUND))
 	set(CMAKE_AUTOMOC ON)
 	set(CMAKE_AUTOUIC ON)
 	set(CMAKE_INCLUDE_CURRENT_DIR ON)
-	set(Qt5_DIR "C:/Usr/bin/Qt5.8.0/lib/cmake/Qt5")
 	find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
 endif()
 
 if(Qt5_FOUND)
+	message(STATUS "Qt5 Found")
 #	add_subdirectory(Tools/Editor)
 endif(Qt5_FOUND)
+
+if(BUILD_MOBILE_TOOLS AND WIN32)
+    message(STATUS "Build With Mobile Tools")
+    add_subdirectory(Tools/Mobile)
+endif()

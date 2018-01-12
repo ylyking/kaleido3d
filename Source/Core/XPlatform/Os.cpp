@@ -10,6 +10,8 @@
 
 #if K3DPLATFORM_OS_WIN
 #include <process.h>
+#else
+#include <sched.h>  
 #endif
 
 namespace k3d
@@ -830,9 +832,10 @@ __INTERNAL_THREAD_ROUTINE_RETURN Thread::RunOnThread(void* Thr)
 }
   
   
-Thread::Thread(k3d::String const& name, ThreadPriority priority)
+Thread::Thread(k3d::String const& name, ThreadPriority priority, I32 CpuId)
   : m_ThreadName(name)
   , m_ThreadPriority(priority)
+  , m_CoreId(CpuId)
   , m_StackSize(DEFAULT_THREAD_STACK_SIZE)
   , m_ThreadStatus(ThreadStatus::Ready)
   , m_ThreadHandle(nullptr)
@@ -919,7 +922,8 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
     m_ThreadFunc = Routine;
     m_ThreadClosure = Closure;
 #if K3DPLATFORM_OS_WINDOWS
-    if (nullptr == m_ThreadHandle) {
+    if (nullptr == m_ThreadHandle)
+    {
       DWORD threadId;
       m_ThreadHandle = ::CreateThread(
         nullptr,
@@ -928,6 +932,10 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
         reinterpret_cast<LPVOID>(this),
         0,
         &threadId);
+      if (m_CoreId >= 0)
+      {
+          ::SetThreadAffinityMask(m_ThreadHandle, 1 << m_CoreId);
+      }
       {
         Mutex::AutoLock lock;
         DWORD tid = ::GetThreadId(m_ThreadHandle);
@@ -937,7 +945,8 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
       }
     }
 #else
-    if (0 == (u_long)m_ThreadHandle) {
+    if (0 == (u_long)m_ThreadHandle)
+    {
       typedef void*(threadfun)(void*);
       pthread_attr_t attr;
       pthread_attr_init(&attr);
@@ -946,6 +955,20 @@ void Thread::InternalStart(ThrRoutine Routine, __internal::ThreadClosure* Closur
 #if K3DPLATFORM_OS_ANDROID
       pthread_setname_np((pthread_t)m_ThreadHandle, m_ThreadName.CStr());
 #endif
+      if(m_CoreId >= 0)
+      {
+#if K3DPLATFORM_OS_MAC || K3DPLATFORM_OS_IOS
+          thread_affinity_policy ap;
+          ap.affinity_tag = 1<<m_CoreId;
+          thread_policy_set(pthread_mach_thread_np((pthread_t)m_ThreadHandle), THREAD_AFFINITY_POLICY,
+                            (integer_t*)&ap, THREAD_AFFINITY_POLICY_COUNT);
+#else
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        CPU_SET(m_CoreId, &mask);
+        pthread_setaffinity_np((pthread_t)m_ThreadHandle, sizeof(mask), &mask);
+#endif
+      }
     }
 #endif
 }
@@ -1041,34 +1064,47 @@ IpAddress::IpAddress(String const& IpStr)
     : d(new IpAddressImpl)
 {
     // Parse IP
-    auto Pos1 = IpStr.FindFirstOf(':');
-    auto Pos2 = IpStr.FindLastOf(':');
+    String IpAddressWithoutPort = IpStr;
+    auto Pos1 = IpStr.FindFirstOf(":");
+    auto Pos2 = IpStr.FindLastOf(":");
+    auto Pos1_6 = IpStr.FindFirstOf("[");
+    auto Pos2_6 = IpStr.FindFirstOf("]");
     if (Pos1 != String::npos && Pos2 != String::npos)
     {
         if (Pos1 != Pos2) // This is an IPV6 address
         {
             d->Type = Type::V6;
+            IpAddressWithoutPort = IpStr.SubStr(Pos1_6 + 1, Pos2_6 - 1);
+            String Port = IpStr.SubStr(Pos2 + 1, IpStr.Length() - Pos2 - 1);
+            SetAddrPort(atoi(*Port));
+        }
+        else // IpV4 With Port
+        {
+            IpAddressWithoutPort = IpStr.SubStr(0, Pos1);
+            String Port = IpStr.SubStr(Pos1 + 1, IpStr.Length() - Pos1 - 1);
+            SetAddrPort(atoi(*Port));
         }
     }
     else
     {
-        // Set Default Port
+        // Set Default Port, Pure Address
+        SetAddrPort(0);
     }
 
     switch (d->Type)
     {
     case V6:
 #if K3DPLATFORM_OS_WINDOWS
-        InetPtonA(AF_INET6, *IpStr, &d->BSDAddr6.sin6_addr);
+        InetPtonA(AF_INET6, *IpAddressWithoutPort, &d->BSDAddr6.sin6_addr);
 #else
-        ::inet_pton(AF_INET6, *IpStr, &d->BSDAddr6.sin6_addr);
+        ::inet_pton(AF_INET6, *IpAddressWithoutPort, &d->BSDAddr6.sin6_addr);
 #endif
         break;
     case V4:
 #if K3DPLATFORM_OS_WINDOWS
-        InetPtonA(AF_INET, *IpStr, &d->BSDAddr.sin_addr);
+        InetPtonA(AF_INET, *IpAddressWithoutPort, &d->BSDAddr.sin_addr);
 #else
-        ::inet_pton(AF_INET, *IpStr, &d->BSDAddr.sin_addr);
+        ::inet_pton(AF_INET, *IpAddressWithoutPort, &d->BSDAddr.sin_addr);
 #endif
         break;
     }
@@ -1128,13 +1164,13 @@ public:
         Type = sType;
     }
 
-    U64 Send(const char* pData, U64 sendLen)
+    I32 Send(const char* pData, I32 sendLen)
     {
         return ::send(Raw, pData, (int)sendLen, 0);
     }
-    U64 Receive(void* pData, U64 recvLen)
+    I32 Receive(void* pData, I32 recvLen)
     {
-        return ::recv(Raw, reinterpret_cast<char*>(pData), (int)recvLen, 0);
+        return ::recv(Raw, reinterpret_cast<char*>(pData), recvLen, 0);
     }
     SocketHandle Accept(IpAddress const& Ip)
     {
@@ -1242,15 +1278,17 @@ void Socket::SetBlocking(bool block)
   d->SetBlocking(block);
 }
 
-void Socket::Connect(IpAddress const& ipAddr)
+bool Socket::Connect(IpAddress const& ipAddr)
 {
   if (!IsValid())
-      return;
+      return false;
   int rm = d->Connect(ipAddr);
   if (rm < 0)
   {
       OnHandleError(GetError());
+      return false;
   }
+  return true;
 }
 
 void Socket::Listen(int maxConn)
@@ -1275,12 +1313,12 @@ Socket* Socket::Accept(IpAddress const& ipAddr)
     return new Socket(d->Type, &NewSock);
 }
 
-U64 Socket::Send(k3d::String const& buffer)
+I32 Socket::Send(k3d::String const& buffer)
 {
-  return d->Send(buffer.CStr(),buffer.Length());
+  return d->Send(buffer.CStr(), (I32)buffer.Length());
 }
 
-U64 Socket::Send(const char* pData, U64 sendLen)
+I32 Socket::Send(const char* pData, I32 sendLen)
 {
   return d->Send(pData, (int)sendLen);
 }
@@ -1299,7 +1337,7 @@ void Socket::OnHandleError(int Code)
 
 }
 
-U64 Socket::Receive(void* pData, U64 recvLen)
+I32 Socket::Receive(void* pData, I32 recvLen)
 {
     return d->Receive(pData, recvLen);
 }
